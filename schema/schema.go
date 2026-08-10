@@ -17,6 +17,7 @@ type Column struct {
 	MaxLength *int     `json:"max_length,omitempty"`
 	Regex     string   `json:"regex,omitempty"`
 	Default   any      `json:"default,omitempty"`
+	// TODO: add support to foreignkeys...
 }
 
 type Table struct {

@@ -6,12 +6,13 @@ import (
 	"log"
 	"os"
 
+	"github.com/arias9306/schema-api/db"
 	"github.com/arias9306/schema-api/schema"
 )
 
 func main() {
 
-	schemaPath := flag.String("schema", "", "Path to JSON schema file")
+	schemaPath := flag.String("schema", "schema.json", "Path to JSON schema file")
 	rows := flag.Int("rows", 100, "Number of fake rows per table")
 	port := flag.Int("port", 8080, "Server port")
 
@@ -31,12 +32,22 @@ func main() {
 	fmt.Println(*port)
 	fmt.Println(*rows)
 
-	// Init DB
+	// TODO: maybe support to add db persistence
+	database, err := db.InitDB(":memory:")
+	if err != nil {
+		log.Fatalf("failed to initialize database: %v", err)
+	}
 
 	for _, table := range schema.Tables {
-		// Create Table
+		if err := db.CreateTable(database, table); err != nil {
+			log.Fatalf("failed to create table %s: %v", table.Name, err)
+		}
+		fmt.Printf("table %s created.\n", table.Name)
+	}
 
-		fmt.Println(table.Name)
+	if *rows > 0 {
+		fmt.Printf("seeding %d rows per table...\n", *rows)
+
 	}
 
 }

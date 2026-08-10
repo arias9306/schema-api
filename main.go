@@ -3,7 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"os"
+
+	"github.com/arias9306/schema-api/schema"
 )
 
 func main() {
@@ -20,7 +23,20 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Println(*rows)
+	schema, err := schema.ParseSchema(*schemaPath)
+	if err != nil {
+		log.Fatalf("failed to parse schema: %v", err)
+	}
+
 	fmt.Println(*port)
-	fmt.Println(*schemaPath)
+	fmt.Println(*rows)
+
+	// Init DB
+
+	for _, table := range schema.Tables {
+		// Create Table
+
+		fmt.Println(table.Name)
+	}
+
 }

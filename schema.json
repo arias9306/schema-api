@@ -1,0 +1,21 @@
+{
+  "tables": [
+    {
+      "name": "users",
+      "columns": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "minLength": 2,
+          "maxLength": 50
+        },
+        { "name": "email", "type": "string", "unique": true },
+        { "name": "age", "type": "int", "min": 18, "max": 120, "default": 18 },
+        { "name": "score", "type": "float", "min": 0.0, "max": 100.0 },
+        { "name": "active", "type": "bool", "default": true },
+        { "name": "joined", "type": "datetime", "default": "now" }
+      ]
+    }
+  ]
+}

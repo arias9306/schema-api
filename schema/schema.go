@@ -6,18 +6,24 @@ import (
 	"os"
 )
 
+type ForeignKey struct {
+	Table  string `json:"table"`
+	Column string `json:"column"`
+}
+
 type Column struct {
-	Name      string   `json:"name"`
-	Type      string   `json:"type"`
-	Required  bool     `json:"required,omitempty"`
-	Unique    bool     `json:"unique,omitempty"`
-	Min       *float64 `json:"min,omitempty"`
-	Max       *float64 `json:"max,omitempty"`
-	MinLength *int     `json:"min_length,omitempty"`
-	MaxLength *int     `json:"max_length,omitempty"`
-	Regex     string   `json:"regex,omitempty"`
-	Default   any      `json:"default,omitempty"`
-	// TODO: add support to foreignkeys...
+	Name       string      `json:"name"`
+	Type       string      `json:"type"`
+	Required   bool        `json:"required,omitempty"`
+	Unique     bool        `json:"unique,omitempty"`
+	Min        *float64    `json:"min,omitempty"`
+	Max        *float64    `json:"max,omitempty"`
+	MinLength  *int        `json:"min_length,omitempty"`
+	MaxLength  *int        `json:"max_length,omitempty"`
+	Regex      string      `json:"regex,omitempty"`
+	Format     string      `json:"format,omitempty"`
+	Default    any         `json:"default,omitempty"`
+	ForeignKey *ForeignKey `json:"foreign_key,omitempty"`
 }
 
 type Table struct {

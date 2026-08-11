@@ -8,6 +8,7 @@ import (
 
 	"github.com/arias9306/schema-api/db"
 	"github.com/arias9306/schema-api/schema"
+	"github.com/arias9306/schema-api/seed"
 )
 
 func main() {
@@ -29,6 +30,7 @@ func main() {
 		log.Fatalf("failed to parse schema: %v", err)
 	}
 
+	fmt.Println(*schema)
 	fmt.Println(*port)
 	fmt.Println(*rows)
 
@@ -47,7 +49,14 @@ func main() {
 
 	if *rows > 0 {
 		fmt.Printf("seeding %d rows per table...\n", *rows)
-
+		if err := seed.Seed(database, schema, *rows); err != nil {
+			log.Fatalf("failed to seed data: %v", err)
+		}
+		fmt.Println("seeding complete.")
 	}
+
+	// api := api.NewAPIHandler(database, schema)
+
+	// mux := http.NewServeMux()
 
 }

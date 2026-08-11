@@ -16,6 +16,34 @@
         { "name": "active", "type": "bool", "default": true },
         { "name": "joined", "type": "datetime", "default": "now" }
       ]
+    },
+    {
+      "name": "posts",
+      "columns": [
+        {
+          "name": "title",
+          "type": "string",
+          "required": true,
+          "format": "title"
+        },
+        { "name": "body", "type": "string", "format": "paragraph" },
+        {
+          "name": "user_id",
+          "type": "int",
+          "foreign_key": { "table": "users", "column": "id" }
+        }
+      ]
+    },
+    {
+      "name": "comments",
+      "columns": [
+        {
+          "name": "title",
+          "type": "string",
+          "required": true,
+          "format": "title"
+        }
+      ]
     }
   ]
 }

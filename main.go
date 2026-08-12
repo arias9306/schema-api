@@ -4,15 +4,18 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 
+	"github.com/arias9306/schema-api/api"
 	"github.com/arias9306/schema-api/db"
 	"github.com/arias9306/schema-api/schema"
 	"github.com/arias9306/schema-api/seed"
 )
 
 func main() {
-
 	schemaPath := flag.String("schema", "schema.json", "Path to JSON schema file")
 	rows := flag.Int("rows", 1, "Number of fake rows per table")
 	port := flag.Int("port", 8080, "Server port")
@@ -29,10 +32,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to parse schema: %v", err)
 	}
-
-	fmt.Println(*schema)
-	fmt.Println(*port)
-	fmt.Println(*rows)
 
 	// TODO: maybe support to add db persistence
 	database, err := db.InitDB(":memory:")
@@ -55,8 +54,26 @@ func main() {
 		fmt.Println("seeding complete.")
 	}
 
-	// api := api.NewAPIHandler(database, schema)
+	handler := api.NewAPIHandler(database, schema)
+	mux := http.NewServeMux()
+	handler.Register(mux)
 
-	// mux := http.NewServeMux()
+	server := &http.Server{
+		Addr:    fmt.Sprintf(":%d", *port),
+		Handler: mux,
+	}
+
+	go func() {
+		sig := make(chan os.Signal, 1)
+		signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+		<-sig
+		fmt.Println("\nShutting down...")
+		server.Close()
+	}()
+
+	fmt.Printf("Server running on http://localhost:%d\n", *port)
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatalf("Server error: %v", err)
+	}
 
 }

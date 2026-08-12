@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/arias9306/schema-api/schema"
@@ -59,7 +60,12 @@ func Seed(db *sql.DB, schema *schema.Schema, rowPerTable int) error {
 			}
 
 			// Insert Row
-			fmt.Println(row)
+			id, err := insertRow(db, table.Name, row)
+			if err != nil {
+				return fmt.Errorf("seeding %s row %d: %w", table.Name, i, err)
+			}
+
+			parentIDs[table.Name] = append(parentIDs[table.Name], id)
 		}
 	}
 
@@ -193,4 +199,40 @@ func randomString(randomizer *rand.Rand, n int) string {
 		b[i] = letters[randomizer.Intn(len(letters))]
 	}
 	return string(b)
+}
+
+func insertRow(db *sql.DB, tableName string, data map[string]any) (int64, error) {
+	columns := make([]string, 0, len(data))
+	values := make([]any, 0, len(data))
+
+	for key, value := range data {
+		columns = append(columns, key)
+		values = append(values, value)
+	}
+
+	placholders := make([]string, len(columns))
+
+	for i := range placholders {
+		placholders[i] = "?"
+	}
+
+	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", tableName, joinColumns(columns), joinColumns(placholders))
+
+	result, err := db.Exec(query, values...)
+	if err != nil {
+		return 0, err
+	}
+
+	return result.LastInsertId()
+}
+
+func joinColumns(columns []string) string {
+	var s strings.Builder
+	for i, column := range columns {
+		if i > 0 {
+			s.WriteString(", ")
+		}
+		s.WriteString(column)
+	}
+	return s.String()
 }

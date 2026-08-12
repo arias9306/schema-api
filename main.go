@@ -14,7 +14,7 @@ import (
 func main() {
 
 	schemaPath := flag.String("schema", "schema.json", "Path to JSON schema file")
-	rows := flag.Int("rows", 100, "Number of fake rows per table")
+	rows := flag.Int("rows", 1, "Number of fake rows per table")
 	port := flag.Int("port", 8080, "Server port")
 
 	flag.Parse()

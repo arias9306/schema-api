@@ -3,20 +3,64 @@ package seed
 import (
 	"database/sql"
 	"fmt"
+	"math/rand"
+	"time"
 
 	"github.com/arias9306/schema-api/schema"
 )
 
-func Seed(db *sql.DB, schema *schema.Schema, rowPerTable int) error {
-	//  add some dictonary of values
-	a, b := topologicalSort(schema.Tables)
+const maxUniqueAttempts = 1000
 
-	if b != nil {
-		return b
+func Seed(db *sql.DB, schema *schema.Schema, rowPerTable int) error {
+	topologicalList, err := topologicalSort(schema.Tables)
+
+	if err != nil {
+		return fmt.Errorf("dependency order: %w", err)
 	}
 
-	for _, name := range a {
-		fmt.Println(name.Name)
+	parentIDs := map[string][]int64{}
+
+	randomizer := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	for _, table := range topologicalList {
+
+		uniqueSets := map[string]map[string]bool{}
+		for _, column := range table.Columns {
+			if column.Unique {
+				uniqueSets[column.Name] = map[string]bool{}
+			}
+		}
+
+		for i := range rowPerTable {
+			row := map[string]any{}
+
+			for _, column := range table.Columns {
+				if column.ForeignKey != nil {
+					foreingKeys := parentIDs[column.ForeignKey.Table]
+
+					if len(foreingKeys) == 0 {
+						continue
+					}
+
+					row[column.Name] = foreingKeys[randomizer.Intn(len(foreingKeys))]
+					continue
+				}
+
+				value, err := generateValue(randomizer, column, uniqueSets[column.Name])
+				if err != nil {
+					return fmt.Errorf("seeding %s row %d column %s: %w", table.Name, i, column.Name, err)
+				}
+
+				row[column.Name] = value
+				if column.Unique {
+					valueString := fmt.Sprintf("%v", value)
+					uniqueSets[column.Name][valueString] = true
+				}
+			}
+
+			// Insert Row
+			fmt.Println(row)
+		}
 	}
 
 	return nil
@@ -83,4 +127,70 @@ func topologicalSort(tables []schema.Table) ([]schema.Table, error) {
 	}
 
 	return result, nil
+}
+
+func generateValue(randomizer *rand.Rand, column schema.Column, used map[string]bool) (any, error) {
+	for attempt := 0; ; attempt++ {
+		var value any
+
+		switch column.Type {
+		case "string":
+			value = generateString(randomizer, column)
+		}
+
+		if column.Unique {
+			valueString := fmt.Sprintf("%v", value)
+
+			if used[valueString] {
+				if attempt >= maxUniqueAttempts {
+					return nil, fmt.Errorf("could not generate a unique value for %s after %d attempts,", column.Name, maxUniqueAttempts)
+				}
+				continue
+			}
+		}
+
+		return value, nil
+	}
+}
+
+func generateString(randomizer *rand.Rand, column schema.Column) string {
+
+	if format := resolveFormat(column); format != "" {
+		if generator, ok := formatGenerators[format]; ok {
+			value := generator(randomizer)
+
+			return value
+		}
+	}
+
+	minLength := 5
+	maxLength := 30
+
+	if column.MinLength != nil {
+		minLength = *column.MinLength
+	}
+
+	if column.MaxLength != nil {
+		maxLength = *column.MaxLength
+	}
+
+	if minLength > maxLength {
+		minLength, maxLength = maxLength, minLength
+	}
+
+	length := minLength
+	if maxLength > minLength {
+		length += randomizer.Intn(maxLength - minLength + 1)
+	}
+
+	return randomString(randomizer, length)
+}
+
+func randomString(randomizer *rand.Rand, n int) string {
+	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letters[randomizer.Intn(len(letters))]
+	}
+	return string(b)
 }

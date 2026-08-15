@@ -27,7 +27,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /{table}/{id}", h.Get)
 	mux.HandleFunc("POST /{table}", h.Create)
 	mux.HandleFunc("PUT /{table}/{id}", h.Update)
-	mux.HandleFunc("DELETE /{table}/{id}", func(w http.ResponseWriter, r *http.Request) {})
+	mux.HandleFunc("DELETE /{table}/{id}", h.Delete)
 }
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
@@ -195,6 +195,35 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, row)
+}
+
+func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
+	tableName := r.PathValue("table")
+	if _, ok := h.findTable(tableName); !ok {
+		writeError(w, http.StatusNotFound, "table not found: %s", tableName)
+		return
+	}
+
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+
+	if err := db.Delete(h.db, tableName, id); err != nil {
+		if strings.Contains(err.Error(), "row not found") {
+			writeError(w, http.StatusNotFound, "row not found")
+			return
+		}
+		if strings.Contains(err.Error(), "FOREIGN KEY constraint") {
+			writeError(w, http.StatusConflict, "cannot delete: referenced by other rows")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "delete failed: %v", err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) findTable(name string) (schema.Table, bool) {

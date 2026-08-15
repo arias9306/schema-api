@@ -181,6 +181,22 @@ func Update(db *sql.DB, table schema.Table, id int64, data map[string]any) error
 	return nil
 }
 
+func Delete(db *sql.DB, tableName string, id int64) error {
+	query := fmt.Sprintf("DELETE FROM %s WHERE id = ?", tableName)
+	result, err := db.Exec(query, id)
+
+	if err != nil {
+		return fmt.Errorf("deleting from %s: %w", tableName, err)
+	}
+
+	affected, _ := result.RowsAffected()
+	if affected == 0 {
+		return fmt.Errorf("row not found")
+	}
+
+	return nil
+}
+
 func scanRow(rows *sql.Rows) (map[string]any, error) {
 	columns, err := rows.Columns()
 	if err != nil {

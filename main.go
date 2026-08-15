@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -8,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/arias9306/schema-api/api"
 	"github.com/arias9306/schema-api/db"
@@ -23,6 +25,7 @@ func main() {
 	rows := flag.Int("rows", 10, "Number of fake rows per table")
 	port := flag.Int("port", 8080, "Server port")
 	showVersion := flag.Bool("version", false, "Print version and exit")
+	corsOrigin := flag.String("cors-origin", "*", "Value for the Access-Control-Allow-Origin header")
 
 	flag.Parse()
 
@@ -80,8 +83,12 @@ func main() {
 	endpoints.PrintTable(endpoints.Collect(schema))
 
 	server := &http.Server{
-		Addr:    fmt.Sprintf(":%d", *port),
-		Handler: withCORS(mux),
+		Addr:              fmt.Sprintf(":%d", *port),
+		Handler:           withCORS(withRequestLog(mux), *corsOrigin),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	go func() {
@@ -89,19 +96,44 @@ func main() {
 		signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 		<-sig
 		fmt.Println("\nShutting down...")
-		server.Close()
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := server.Shutdown(ctx); err != nil {
+			fmt.Printf("graceful shutdown failed: %v\n", err)
+		}
 	}()
 
 	fmt.Printf("\nServer running on http://localhost:%d\n", *port)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("Server error: %v", err)
 	}
-
 }
 
-func withCORS(next http.Handler) http.Handler {
+func withRequestLog(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		start := time.Now()
+
+		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(rec, r)
+
+		log.Printf("%s %s -> %d (%s)", r.Method, r.URL.Path, rec.status, time.Since(start))
+	})
+}
+
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (r *statusRecorder) WriteHeader(status int) {
+	r.status = status
+	r.ResponseWriter.WriteHeader(status)
+}
+
+func withCORS(next http.Handler, origin string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 

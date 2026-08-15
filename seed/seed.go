@@ -5,16 +5,16 @@ import (
 	"database/sql"
 	"fmt"
 	"math/rand"
-	"strings"
 	"time"
 
+	"github.com/arias9306/schema-api/db"
 	"github.com/arias9306/schema-api/fakegen"
 	"github.com/arias9306/schema-api/schema"
 )
 
 const maxUniqueAttempts = 1000
 
-func Seed(db *sql.DB, schema *schema.Schema, rowPerTable int) error {
+func Seed(database *sql.DB, schema *schema.Schema, rowPerTable int) error {
 	topologicalList, err := topologicalSort(schema.Tables)
 
 	if err != nil {
@@ -62,7 +62,7 @@ func Seed(db *sql.DB, schema *schema.Schema, rowPerTable int) error {
 			}
 
 			// Insert Row
-			id, err := insertRow(db, table.Name, row)
+			id, err := db.Insert(database, table, row)
 			if err != nil {
 				return fmt.Errorf("seeding %s row %d: %w", table.Name, i, err)
 			}
@@ -170,40 +170,4 @@ func columnToSpec(column schema.Column) fakegen.Spec {
 		Format:    resolveFormat(column),
 		Default:   column.Default,
 	}
-}
-
-func insertRow(db *sql.DB, tableName string, data map[string]any) (int64, error) {
-	columns := make([]string, 0, len(data))
-	values := make([]any, 0, len(data))
-
-	for key, value := range data {
-		columns = append(columns, key)
-		values = append(values, value)
-	}
-
-	placholders := make([]string, len(columns))
-
-	for i := range placholders {
-		placholders[i] = "?"
-	}
-
-	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", tableName, joinColumns(columns), joinColumns(placholders))
-
-	result, err := db.Exec(query, values...)
-	if err != nil {
-		return 0, err
-	}
-
-	return result.LastInsertId()
-}
-
-func joinColumns(columns []string) string {
-	var s strings.Builder
-	for i, column := range columns {
-		if i > 0 {
-			s.WriteString(", ")
-		}
-		s.WriteString(column)
-	}
-	return s.String()
 }

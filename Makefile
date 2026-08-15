@@ -3,7 +3,16 @@ DIST_DIR    := dist
 OS_LIST     := linux windows darwin
 ARCH_LIST   := amd64 arm64
 GOFLAGS     := -trimpath
-LDFLAGS     := -s -w
+PKG         := github.com/arias9306/schema-api
+
+VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+COMMIT     ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
+BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+
+LDFLAGS = -s -w \
+	-X $(PKG)/version.Version=$(VERSION) \
+	-X $(PKG)/version.Commit=$(COMMIT) \
+	-X $(PKG)/version.BuildDate=$(BUILD_DATE)
 
 .PHONY: all build test clean
 
@@ -15,12 +24,22 @@ build:
 		for arch in $(ARCH_LIST); do \
 			ext=""; \
 			[ "$$os" = "windows" ] && ext=".exe"; \
-			echo "Building $$os/$$arch..."; \
+			staging="$(DIST_DIR)/staging/$$os-$$arch"; \
+			archive="$(CURDIR)/$(DIST_DIR)/$(BINARY_NAME)-$$os-$$arch-$(VERSION)"; \
+			echo "Building $$os/$$arch (version $(VERSION))..."; \
+			mkdir -p "$$staging"; \
 			GOOS=$$os GOARCH=$$arch CGO_ENABLED=0 \
 			go build $(GOFLAGS) -ldflags "$(LDFLAGS)" \
-				-o "$(DIST_DIR)/$(BINARY_NAME)-$$os-$$arch$$ext" .; \
+				-o "$$staging/$(BINARY_NAME)$$ext" .; \
+			if [ "$$os" = "windows" ]; then \
+				(cd "$$staging" && zip -q "$$archive.zip" "$(BINARY_NAME).exe"); \
+			else \
+				tar -czf "$$archive.tar.gz" -C "$$staging" "$(BINARY_NAME)"; \
+			fi; \
+			rm -rf "$$staging"; \
 		done; \
 	done
+	@rm -rf $(DIST_DIR)/staging
 
 test:
 	go test ./...

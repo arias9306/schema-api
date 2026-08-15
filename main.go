@@ -13,14 +13,21 @@ import (
 	"github.com/arias9306/schema-api/db"
 	"github.com/arias9306/schema-api/schema"
 	"github.com/arias9306/schema-api/seed"
+	"github.com/arias9306/schema-api/version"
 )
 
 func main() {
 	schemaPath := flag.String("schema", "schema.json", "Path to JSON schema file")
 	rows := flag.Int("rows", 10, "Number of fake rows per table")
 	port := flag.Int("port", 8080, "Server port")
+	showVersion := flag.Bool("version", false, "Print version and exit")
 
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(version.String())
+		os.Exit(0)
+	}
 
 	if *schemaPath == "" {
 		fmt.Fprintln(os.Stderr, "error: --schema is required")

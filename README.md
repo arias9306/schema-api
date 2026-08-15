@@ -58,12 +58,13 @@ make clean   # remove dist/
 ./schema-api [flags]
 ```
 
-| Flag       | Default      | Description                                                     |
-| ---------- | ------------ | --------------------------------------------------------------- |
-| `-schema`  | _(required)_ | Path to the JSON schema file                                    |
-| `-rows`    | `10`         | Number of fake rows to seed per table (use `0` to skip seeding; tables only) |
-| `-port`    | `8080`       | Server port                                                     |
-| `-version` | `false`      | Print version info and exit                                     |
+| Flag         | Default      | Description                                                     |
+| ------------ | ------------ | --------------------------------------------------------------- |
+| `-schema`    | _(required)_ | Path to the JSON schema file                                    |
+| `-rows`      | `10`         | Number of fake rows to seed per table (use `0` to skip seeding; tables only) |
+| `-port`      | `8080`       | Server port                                                     |
+| `-cors-origin` | `*`        | Value for the `Access-Control-Allow-Origin` response header     |
+| `-version`   | `false`      | Print version info and exit                                     |
 
 The `-schema` flag is required; the server exits with an error if it is omitted.
 

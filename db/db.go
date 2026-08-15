@@ -1,3 +1,4 @@
+// Package db provides database helpers for schema-backed tables.
 package db
 
 import (

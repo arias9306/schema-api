@@ -1,3 +1,4 @@
+// Package api provides HTTP handlers for the schema API.
 package api
 
 import (

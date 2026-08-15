@@ -1,3 +1,4 @@
+// Package seed generates and inserts sample data for schema-defined tables.
 package seed
 
 import (

@@ -1,3 +1,4 @@
+// Package schema defines the data model and parsing logic for database schemas.
 package schema
 
 import (

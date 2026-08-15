@@ -1,3 +1,4 @@
+// Package validation provides validation functionality for schema tables and columns.
 package validation
 
 import (

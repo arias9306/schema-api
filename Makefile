@@ -14,7 +14,7 @@ LDFLAGS = -s -w \
 	-X $(PKG)/version.Commit=$(COMMIT) \
 	-X $(PKG)/version.BuildDate=$(BUILD_DATE)
 
-.PHONY: all build test clean
+.PHONY: all build test clean changelog changelog-unreleased
 
 all: build
 
@@ -46,3 +46,9 @@ test:
 
 clean:
 	rm -rf $(DIST_DIR)
+
+changelog:
+	git cliff -o CHANGELOG.md
+
+changelog-unreleased:
+	git cliff --unreleased

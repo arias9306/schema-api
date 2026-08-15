@@ -79,8 +79,8 @@ Examples:
 ```
 
 On startup, each table is created and seeded (and mock endpoints are
-registered), then the server runs until interrupted (Ctrl-C sends a graceful
-shutdown):
+registered), then the server prints the endpoints it exposes and runs until
+interrupted (Ctrl-C sends a graceful shutdown):
 
 ```
 table users created.
@@ -89,6 +89,17 @@ table comments created.
 seeding 10 rows per table...
 seeding complete.
 mock endpoints registered.
+Endpoints
+METHOD  PATH                 SOURCE  STATUS
+------  -------------------  ------  ------
+GET     /users               crud    200
+GET     /users/{id}          crud    200
+POST    /users               crud    201
+PUT     /users/{id}          crud    200
+DELETE  /users/{id}          crud    204
+...
+GET     /users/{id}/profile  mock    200
+POST    /echo                mock    201
 Server running on http://localhost:8080
 ```
 

@@ -32,13 +32,36 @@ var emailDomains = []string{
 	"icloud.com", "company.com", "example.org", "mail.com", "aol.com", "acme.com",
 }
 
+var cities = []string{
+	"Bucaramanga", "Bogotá", "Medellín", "Cali", "Barranquilla", "Cartagena",
+	"Santa Marta", "Pereira", "Manizales", "Cúcuta",
+	"Villavicencio", "Ibagué", "Pasto", "Montería", "Neiva",
+	"Armenia", "Sincelejo", "Popayán", "Tunja", "Valledupar",
+}
+
+var countries = []string{
+	"Colombia", "Alemania", "Argentina", "Brasil", "Chile", "México",
+	"Perú", "Ecuador", "Venezuela", "Uruguay", "Paraguay",
+	"Bolivia", "Panamá", "Costa Rica", "Honduras", "Guatemala",
+	"El Salvador", "Nicaragua", "República Dominicana", "Cuba", "España",
+}
+
+var streetNames = []string{"Calle", "Carrera"}
+
 type generator func(randomizer *rand.Rand) string
 
 var formatGenerators = map[string]generator{
-	"username":  genUsername,
+	"name":      genFullName,
 	"firstname": genFirstname,
 	"lastname":  genLastname,
+	"username":  genUsername,
 	"email":     genEmail,
+	"phone":     genPhone,
+	"address":   genAddress,
+	"city":      genCity,
+	"country":   genCountry,
+	"url":       genURL,
+	"uuid":      genUUID,
 }
 
 func resolveFormat(column schema.Column) string {
@@ -57,6 +80,7 @@ func resolveFormat(column schema.Column) string {
 		needle string
 		format string
 	}{
+		{"name", "name"},
 		{"email", "email"},
 		{"user_name", "username"},
 		{"username", "username"},
@@ -64,6 +88,12 @@ func resolveFormat(column schema.Column) string {
 		{"firstname", "firstname"},
 		{"last_name", "lastname"},
 		{"lastname", "lastname"},
+		{"phone", "phone"},
+		{"address", "address"},
+		{"city", "city"},
+		{"country", "country"},
+		{"url", "url"},
+		{"uuid", "uuid"},
 	}
 
 	for _, heuristic := range heuristics {
@@ -92,4 +122,37 @@ func genEmail(randomizer *rand.Rand) string {
 	last := strings.ToLower(genLastname(randomizer))
 	domain := emailDomains[randomizer.Intn(len(emailDomains))]
 	return fmt.Sprintf("%s.%s%d@%s", first, last, randomizer.Intn(1000), domain)
+}
+
+func genFullName(randomizer *rand.Rand) string {
+	return genFirstname(randomizer) + " " + genLastname(randomizer)
+}
+
+func genPhone(randomizer *rand.Rand) string {
+	return fmt.Sprintf("+57 3%04d", randomizer.Intn(999999999))
+}
+
+func genAddress(randomizer *rand.Rand) string {
+	return fmt.Sprintf("%s %d # %d - %d", streetNames[randomizer.Intn(len(streetNames))], randomizer.Intn(100), randomizer.Intn(100), randomizer.Intn(100))
+}
+
+func genCity(randomizer *rand.Rand) string {
+	return cities[randomizer.Intn(len(cities))]
+}
+
+func genCountry(randomizer *rand.Rand) string {
+	return countries[randomizer.Intn(len(countries))]
+}
+
+func genURL(randomizer *rand.Rand) string {
+	word := strings.Split(emailDomains[randomizer.Intn(len(emailDomains))], ".")[0]
+	return fmt.Sprintf("https://%s.acme/", word)
+}
+
+func genUUID(randomizer *rand.Rand) string {
+	b := make([]byte, 16)
+	randomizer.Read(b)
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }

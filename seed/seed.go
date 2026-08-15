@@ -143,6 +143,42 @@ func generateValue(randomizer *rand.Rand, column schema.Column, used map[string]
 		switch column.Type {
 		case "string":
 			value = generateString(randomizer, column)
+
+		case "int":
+			min := 0.0
+			max := 10000.0
+
+			if column.Min != nil {
+				min = *column.Min
+			}
+
+			if column.Max != nil {
+				max = *column.Max
+			}
+
+			value = int(min) + randomizer.Intn(int(max-min)+1)
+
+		case "float":
+
+			min := 0.0
+			max := 10000.0
+
+			if column.Min != nil {
+				min = *column.Min
+			}
+			if column.Max != nil {
+				max = *column.Max
+			}
+
+			value = float64(int((min+randomizer.Float64()*(max-min))*100)) / 100
+
+		case "bool":
+			value = randomizer.Intn(2) == 1
+
+		case "datetime":
+			days := randomizer.Intn(365 * 2)
+			t := time.Now().AddDate(0, 0, -days)
+			value = t.Format(time.RFC3339)
 		}
 
 		if column.Unique {

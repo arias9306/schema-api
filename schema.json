@@ -14,7 +14,8 @@
         { "name": "age", "type": "int", "min": 18, "max": 120, "default": 18 },
         { "name": "score", "type": "float", "min": 0.0, "max": 100.0 },
         { "name": "active", "type": "bool", "default": true },
-        { "name": "joined", "type": "datetime", "default": "now" }
+        { "name": "joined", "type": "datetime", "default": "now" },
+        { "name": "address", "type": "string", "format": "address" }
       ]
     },
     {

@@ -22,8 +22,8 @@ func (v *ValidationError) Add(format string, args ...any) {
 	v.Errors = append(v.Errors, fmt.Sprintf(format, args...))
 }
 
-func (e *ValidationError) HasErrors() bool {
-	return len(e.Errors) > 0
+func (v *ValidationError) HasErrors() bool {
+	return len(v.Errors) > 0
 }
 
 func ValidateCreate(table schema.Table, data map[string]any) (*ValidationError, map[string]any) {

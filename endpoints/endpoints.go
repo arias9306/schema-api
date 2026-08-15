@@ -81,7 +81,7 @@ func PrintTable(routes []Info) {
 		}
 	}
 
-	fmt.Println("Endpoints")
+	fmt.Printf("\nEndpoints\n\n")
 	printRow(header, widths)
 	for i, w := range widths {
 		if i > 0 {

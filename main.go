@@ -92,7 +92,7 @@ func main() {
 		server.Close()
 	}()
 
-	fmt.Printf("Server running on http://localhost:%d\n", *port)
+	fmt.Printf("\nServer running on http://localhost:%d\n", *port)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("Server error: %v", err)
 	}

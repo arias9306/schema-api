@@ -155,6 +155,32 @@ func Insert(db *sql.DB, table schema.Table, data map[string]any) (int64, error) 
 	return result.LastInsertId()
 }
 
+func Update(db *sql.DB, table schema.Table, id int64, data map[string]any) error {
+	sets := []string{}
+	values := []any{}
+
+	for _, column := range table.Columns {
+		if value, ok := data[column.Name]; ok {
+			sets = append(sets, fmt.Sprintf("%s = ?", column.Name))
+			values = append(values, value)
+		}
+	}
+
+	if len(sets) == 0 {
+		return nil
+	}
+
+	values = append(values, id)
+	query := fmt.Sprintf("UPDATE %s SET %s WHERE id = ?", table.Name, strings.Join(sets, ", "))
+
+	_, err := db.Exec(query, values...)
+	if err != nil {
+		return fmt.Errorf("updating %s: %w", table.Name, err)
+	}
+
+	return nil
+}
+
 func scanRow(rows *sql.Rows) (map[string]any, error) {
 	columns, err := rows.Columns()
 	if err != nil {

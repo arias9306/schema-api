@@ -57,6 +57,22 @@ func ValidateCreate(table schema.Table, data map[string]any) (*ValidationError, 
 	return errors, cleaned
 }
 
+func ValidateUpdate(table schema.Table, data map[string]any) *ValidationError {
+	errors := &ValidationError{}
+
+	for _, column := range table.Columns {
+		value, ok := data[column.Name]
+		if !ok {
+			continue
+		}
+		if err := validateColumn(column, value); err != "" {
+			errors.Add("%s: %s", column.Name, err)
+		}
+	}
+
+	return errors
+}
+
 func processDefault(column schema.Column) any {
 	if column.Type == "datetime" {
 		if s, ok := column.Default.(string); ok && s == "now" {

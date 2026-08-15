@@ -26,7 +26,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /{table}", h.List)
 	mux.HandleFunc("GET /{table}/{id}", h.Get)
 	mux.HandleFunc("POST /{table}", h.Create)
-	mux.HandleFunc("PUT /{table}/{id}", func(w http.ResponseWriter, r *http.Request) {})
+	mux.HandleFunc("PUT /{table}/{id}", h.Update)
 	mux.HandleFunc("DELETE /{table}/{id}", func(w http.ResponseWriter, r *http.Request) {})
 }
 
@@ -137,6 +137,64 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, row)
+}
+
+func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
+	tableName := r.PathValue("table")
+	table, ok := h.findTable(tableName)
+	if !ok {
+		writeError(w, http.StatusNotFound, "table not found: %s", tableName)
+		return
+	}
+
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+	}
+
+	existing, err := db.SelectByID(h.db, tableName, id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "query failed: %v", err)
+		return
+	}
+	if existing == nil {
+		writeError(w, http.StatusNotFound, "row not found")
+		return
+	}
+
+	var data map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON: %v", err)
+		return
+	}
+
+	errors := validation.ValidateUpdate(table, data)
+	if errors.HasErrors() {
+		writeJSON(w, http.StatusUnprocessableEntity, errors)
+		return
+	}
+
+	if err := db.Update(h.db, table, id, data); err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint") {
+			writeError(w, http.StatusConflict, "unique constraint violation")
+			return
+		}
+		if strings.Contains(err.Error(), "FOREIGN KEY constraint") {
+			writeError(w, http.StatusBadRequest, "foreign key violation")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "update failed: %v", err)
+		return
+	}
+
+	row, err := db.SelectByID(h.db, tableName, id)
+	if err != nil || row == nil {
+		writeError(w, http.StatusInternalServerError, "failed to retrieve update rows")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, row)
 }
 
 func (h *Handler) findTable(name string) (schema.Table, bool) {

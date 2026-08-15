@@ -165,8 +165,9 @@ func generateString(randomizer *rand.Rand, column schema.Column) string {
 	if format := resolveFormat(column); format != "" {
 		if generator, ok := formatGenerators[format]; ok {
 			value := generator(randomizer)
-
-			return value
+			if !violatesExplicitLength(column, value) {
+				return value
+			}
 		}
 	}
 
@@ -191,6 +192,17 @@ func generateString(randomizer *rand.Rand, column schema.Column) string {
 	}
 
 	return randomString(randomizer, length)
+}
+
+func violatesExplicitLength(column schema.Column, value string) bool {
+	if column.MinLength != nil && len(value) < *column.MinLength {
+		return true
+	}
+	if column.MaxLength != nil && len(value) > *column.MaxLength {
+		return true
+	}
+
+	return false
 }
 
 func randomString(randomizer *rand.Rand, n int) string {

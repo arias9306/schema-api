@@ -159,7 +159,7 @@ func validateColumn(column schema.Column, value any) string {
 			return "must be a string"
 		}
 
-		formats := []string{time.RFC3339, "1993-05-06 10:03:06", "2019-06-12"}
+		formats := []string{time.RFC3339, "2006-01-02 15:04:05", "2006-01-02"}
 		valid := false
 
 		for _, format := range formats {

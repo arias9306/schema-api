@@ -131,7 +131,7 @@ func topologicalSort(tables []schema.Table) ([]schema.Table, error) {
 	}
 
 	if len(result) != len(tables) {
-		return nil, fmt.Errorf("circula dependency detected")
+		return nil, fmt.Errorf("circular dependency detected")
 	}
 
 	return result, nil

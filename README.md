@@ -48,8 +48,10 @@ make build
 Other useful targets:
 
 ```bash
-make test    # go test ./...
-make clean   # remove dist/
+make test        # go test ./...
+make test-race   # go test -race ./...
+make coverage    # run tests with a coverage profile and open the HTML report
+make clean       # remove dist/
 ```
 
 ## Usage
@@ -58,13 +60,13 @@ make clean   # remove dist/
 ./schema-api [flags]
 ```
 
-| Flag         | Default      | Description                                                     |
-| ------------ | ------------ | --------------------------------------------------------------- |
-| `-schema`    | _(required)_ | Path to the JSON schema file                                    |
-| `-rows`      | `10`         | Number of fake rows to seed per table (use `0` to skip seeding; tables only) |
-| `-port`      | `8080`       | Server port                                                     |
-| `-cors-origin` | `*`        | Value for the `Access-Control-Allow-Origin` response header     |
-| `-version`   | `false`      | Print version info and exit                                     |
+| Flag           | Default      | Description                                                                  |
+| -------------- | ------------ | ---------------------------------------------------------------------------- |
+| `-schema`      | _(required)_ | Path to the JSON schema file                                                 |
+| `-rows`        | `10`         | Number of fake rows to seed per table (use `0` to skip seeding; tables only) |
+| `-port`        | `8080`       | Server port                                                                  |
+| `-cors-origin` | `*`          | Value for the `Access-Control-Allow-Origin` response header                  |
+| `-version`     | `false`      | Print version info and exit                                                  |
 
 The `-schema` flag is required; the server exits with an error if it is omitted.
 
@@ -217,12 +219,16 @@ no database involved.
       "response": {
         "user_id": "{{path.id}}",
         "page": "{{query.page}}",
-        "name":   { "type": "string", "min_length": 5, "max_length": 20 },
-        "age":    { "type": "int", "min": 18, "max": 80 },
+        "name": { "type": "string", "min_length": 5, "max_length": 20 },
+        "age": { "type": "int", "min": 18, "max": 80 },
         "active": { "type": "bool" },
         "joined": { "type": "datetime" },
-        "score":  { "type": "float", "min": 0, "max": 100 },
-        "tags":   { "type": "array", "count": 5, "items": { "type": "string", "max_length": 10 } },
+        "score": { "type": "float", "min": 0, "max": 100 },
+        "tags": {
+          "type": "array",
+          "count": 5,
+          "items": { "type": "string", "max_length": 10 }
+        },
         "profile": { "bio": { "type": "string", "max_length": 120 } },
         "fixed": "literal value"
       }
@@ -233,13 +239,13 @@ no database involved.
 
 ### Endpoint properties
 
-| Property   | Type              | Description                                                          |
-| ---------- | ----------------- | -------------------------------------------------------------------- |
-| `method`   | string (required) | `GET`, `POST`, `PUT`, `PATCH`, or `DELETE` (case-insensitive)        |
-| `path`     | string (required) | Starts with `/`; supports Go 1.22 wildcards like `{id}`               |
-| `status`   | int               | Response status code, defaults to `200`                              |
-| `headers`  | object            | Static response headers                                              |
-| `response` | object (required) | Response template (see below)                                        |
+| Property   | Type              | Description                                                   |
+| ---------- | ----------------- | ------------------------------------------------------------- |
+| `method`   | string (required) | `GET`, `POST`, `PUT`, `PATCH`, or `DELETE` (case-insensitive) |
+| `path`     | string (required) | Starts with `/`; supports Go 1.22 wildcards like `{id}`       |
+| `status`   | int               | Response status code, defaults to `200`                       |
+| `headers`  | object            | Static response headers                                       |
+| `response` | object (required) | Response template (see below)                                 |
 
 Example request/response for the schema above:
 
@@ -274,18 +280,18 @@ The `response` value is walked recursively:
   shared fake generator. Length/range keys use snake_case (`min_length`,
   `max_length`), matching the column format. Supported spec types:
 
-  | Type       | Extra keys                                      |
-  | ---------- | ----------------------------------------------- |
-  | `string`   | `min_length`, `max_length`, `format`            |
-  | `int`      | `min`, `max`                                    |
-  | `float`    | `min`, `max`                                    |
-  | `bool`     | —                                               |
-  | `datetime` | —                                               |
-  | `array`    | `count`, `items` (nested spec or template)      |
-  | `object`   | `properties` (map of nested specs/templates)    |
+  | Type       | Extra keys                                   |
+  | ---------- | -------------------------------------------- |
+  | `string`   | `min_length`, `max_length`, `format`         |
+  | `int`      | `min`, `max`                                 |
+  | `float`    | `min`, `max`                                 |
+  | `bool`     | —                                            |
+  | `datetime` | —                                            |
+  | `array`    | `count`, `items` (nested spec or template)   |
+  | `object`   | `properties` (map of nested specs/templates) |
 
   A top-level generator spec (e.g. `{ "type": "array", "count": 3, "items":
-  {...} }`) returns a JSON array.
+{...} }`) returns a JSON array.
 
   String specs without an explicit `format` inherit the name heuristics used
   for tables — e.g. `"email": { "type": "string" }` generates an email, and
@@ -294,13 +300,13 @@ The `response` value is walked recursively:
 
 - **Interpolation** — strings containing `{{...}}` are interpolated:
 
-  | Source               | Description                                                          |
-  | -------------------- | -------------------------------------------------------------------- |
-  | `{{path.name}}`      | URL wildcard value (e.g. `{{path.id}}` for `/users/{id}`)            |
-  | `{{query.name}}`     | Query parameter value                                                |
-  | `{{header.name}}`    | Request header — use the lowercase name (e.g. `{{header.x-mock}}`)   |
-  | `{{body.name}}`      | Value from the JSON request body (POST/PUT/PATCH echo)               |
-  | `{{now}}`            | Current time (RFC3339)                                               |
+  | Source            | Description                                                        |
+  | ----------------- | ------------------------------------------------------------------ |
+  | `{{path.name}}`   | URL wildcard value (e.g. `{{path.id}}` for `/users/{id}`)          |
+  | `{{query.name}}`  | Query parameter value                                              |
+  | `{{header.name}}` | Request header — use the lowercase name (e.g. `{{header.x-mock}}`) |
+  | `{{body.name}}`   | Value from the JSON request body (POST/PUT/PATCH echo)             |
+  | `{{now}}`         | Current time (RFC3339)                                             |
 
   Missing keys resolve to an empty string; interpolated values are always
   strings.

@@ -4,6 +4,7 @@ package endpoints
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/arias9306/schema-api/schema"
 )
@@ -59,9 +60,15 @@ func Collect(s *schema.Schema) []Info {
 }
 
 func PrintTable(routes []Info) {
+	fmt.Print(formatTable(routes))
+}
+
+func formatTable(routes []Info) string {
 	if len(routes) == 0 {
-		return
+		return ""
 	}
+
+	var b strings.Builder
 
 	header := []string{"METHOD", "PATH", "SOURCE", "STATUS"}
 	rows := make([][]string, 0, len(routes))
@@ -81,28 +88,30 @@ func PrintTable(routes []Info) {
 		}
 	}
 
-	fmt.Printf("\nEndpoints\n\n")
-	printRow(header, widths)
+	b.WriteString("\nEndpoints\n\n")
+	printRow(&b, header, widths)
 	for i, w := range widths {
 		if i > 0 {
-			fmt.Print("  ")
+			b.WriteString("  ")
 		}
 		for j := 0; j < w; j++ {
-			fmt.Print("-")
+			b.WriteString("-")
 		}
 	}
-	fmt.Println()
+	b.WriteString("\n")
 	for _, row := range rows {
-		printRow(row, widths)
+		printRow(&b, row, widths)
 	}
+
+	return b.String()
 }
 
-func printRow(cells []string, widths []int) {
+func printRow(b *strings.Builder, cells []string, widths []int) {
 	for i, cell := range cells {
 		if i > 0 {
-			fmt.Print("  ")
+			b.WriteString("  ")
 		}
-		fmt.Printf("%-*s", widths[i], cell)
+		fmt.Fprintf(b, "%-*s", widths[i], cell)
 	}
-	fmt.Println()
+	b.WriteString("\n")
 }

@@ -15,7 +15,7 @@ LDFLAGS = -s -w \
 	-X $(PKG)/version.Commit=$(COMMIT) \
 	-X $(PKG)/version.BuildDate=$(BUILD_DATE)
 
-.PHONY: all build test lint clean changelog changelog-unreleased
+.PHONY: all build test test-race coverage lint clean changelog changelog-unreleased
 
 all: build
 
@@ -45,6 +45,15 @@ build:
 
 test:
 	go test ./...
+
+test-race:
+	go test -race ./...
+
+coverage:
+	go test -coverprofile=/tmp/schema-api-cover.out ./...
+	@go tool cover -func=/tmp/schema-api-cover.out | tail -n 1
+	@go tool cover -html=/tmp/schema-api-cover.out -o /tmp/schema-api-cover.html
+	@echo "HTML coverage report written to /tmp/schema-api-cover.html"
 
 lint:
 	golangci-lint run ./...

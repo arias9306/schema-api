@@ -129,6 +129,32 @@ func SelectByID(db *sql.DB, tableName string, id int64) (map[string]any, error) 
 	return scanRow(rows)
 }
 
+func Insert(db *sql.DB, table schema.Table, data map[string]any) (int64, error) {
+	columns := make([]string, 0, len(data))
+	values := make([]any, 0, len(data))
+
+	for _, column := range table.Columns {
+		if value, ok := data[column.Name]; ok {
+			columns = append(columns, column.Name)
+			values = append(values, value)
+		}
+	}
+
+	placeholders := make([]string, len(columns))
+	for i := range placeholders {
+		placeholders[i] = "?"
+	}
+
+	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", table.Name, strings.Join(columns, ", "), strings.Join(placeholders, ", "))
+
+	result, err := db.Exec(query, values...)
+	if err != nil {
+		return 0, fmt.Errorf("inserting into %s: %w", table.Name, err)
+	}
+
+	return result.LastInsertId()
+}
+
 func scanRow(rows *sql.Rows) (map[string]any, error) {
 	columns, err := rows.Columns()
 	if err != nil {

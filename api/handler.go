@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/arias9306/schema-api/db"
 	"github.com/arias9306/schema-api/schema"
+	"github.com/arias9306/schema-api/validation"
 )
 
 type Handler struct {
@@ -22,8 +24,8 @@ func NewAPIHandler(database *sql.DB, schema *schema.Schema) *Handler {
 
 func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /{table}", h.List)
-	mux.HandleFunc("GET /{table}/{id}", func(w http.ResponseWriter, r *http.Request) {})
-	mux.HandleFunc("POST /{table}", func(w http.ResponseWriter, r *http.Request) {})
+	mux.HandleFunc("GET /{table}/{id}", h.Get)
+	mux.HandleFunc("POST /{table}", h.Create)
 	mux.HandleFunc("PUT /{table}/{id}", func(w http.ResponseWriter, r *http.Request) {})
 	mux.HandleFunc("DELETE /{table}/{id}", func(w http.ResponseWriter, r *http.Request) {})
 }
@@ -89,6 +91,52 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, row)
+}
+
+func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
+	tableName := r.PathValue("table")
+	table, ok := h.findTable(tableName)
+
+	if !ok {
+		writeError(w, http.StatusNotFound, "table not found: %s", tableName)
+		return
+	}
+
+	var data map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON: %v", err)
+		return
+	}
+
+	errors, cleaned := validation.ValidateCreate(table, data)
+	if errors.HasErrors() {
+		writeJSON(w, http.StatusUnprocessableEntity, errors)
+		return
+	}
+
+	id, err := db.Insert(h.db, table, cleaned)
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint") {
+			writeError(w, http.StatusConflict, "unique constraint violation")
+			return
+		}
+
+		if strings.Contains(err.Error(), "FOREIGN KEY constraint") {
+			writeError(w, http.StatusBadRequest, "foreign key violation")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "failed to retrieve create row")
+		return
+	}
+
+	row, err := db.SelectByID(h.db, tableName, id)
+	if err != nil || row == nil {
+		writeError(w, http.StatusInternalServerError, "failed to retrieve created row")
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, row)
 }
 
 func (h *Handler) findTable(name string) (schema.Table, bool) {

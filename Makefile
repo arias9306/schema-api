@@ -15,7 +15,7 @@ LDFLAGS = -s -w \
 	-X $(PKG)/version.Commit=$(COMMIT) \
 	-X $(PKG)/version.BuildDate=$(BUILD_DATE)
 
-.PHONY: all build test clean changelog changelog-unreleased
+.PHONY: all build test lint clean changelog changelog-unreleased
 
 all: build
 
@@ -45,6 +45,9 @@ build:
 
 test:
 	go test ./...
+
+lint:
+	golangci-lint run ./...
 
 clean:
 	rm -rf $(DIST_DIR)

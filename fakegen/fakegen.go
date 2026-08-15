@@ -4,6 +4,7 @@ package fakegen
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"strings"
 	"time"
@@ -125,7 +126,16 @@ func Value(randomizer *rand.Rand, spec Spec) (any, error) {
 			max = *spec.Max
 		}
 
-		return int(min) + randomizer.Intn(int(max-min)+1), nil
+		if max <= min {
+			return int(min), nil
+		}
+
+		rangeSize := max - min
+		if rangeSize >= math.MaxInt32 {
+			return int(min) + randomizer.Intn(math.MaxInt32), nil
+		}
+
+		return int(min) + randomizer.Intn(int(rangeSize)+1), nil
 
 	case "float":
 		min := 0.0
@@ -137,6 +147,10 @@ func Value(randomizer *rand.Rand, spec Spec) (any, error) {
 
 		if spec.Max != nil {
 			max = *spec.Max
+		}
+
+		if max <= min {
+			return min, nil
 		}
 
 		return float64(int((min+randomizer.Float64()*(max-min))*100)) / 100, nil

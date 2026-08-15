@@ -49,6 +49,69 @@ func CreateTable(db *sql.DB, table schema.Table) error {
 	return nil
 }
 
+func SelectAll(db *sql.DB, tableName string, page int, limit int, sort string, order string) ([]map[string]any, int, error) {
+	countQuery := fmt.Sprintf("SELECT COUNT(1) FROM %s", tableName)
+
+	var total int
+	if err := db.QueryRow(countQuery).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("counting %s: %w", tableName, err)
+	}
+
+	if sort == "" {
+		sort = "id"
+	}
+
+	if order == "" {
+		order = "asc"
+	}
+	order = strings.ToLower(order)
+	if order != "asc" && order != "desc" {
+		order = "asc"
+	}
+
+	offset := (page - 1) * limit
+
+	query := fmt.Sprintf("SELECT * FROM %s ORDER BY %s %s LIMIT ? OFFSET ?", tableName, sort, order)
+
+	rows, err := db.Query(query, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("querying %s: %w", tableName, err)
+	}
+
+	defer rows.Close()
+
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, 0, err
+	}
+
+	results := []map[string]any{}
+	for rows.Next() {
+		values := make([]any, len(cols))
+		valuePtrs := make([]any, len(cols))
+
+		for i := range values {
+			valuePtrs[i] = &values[i]
+		}
+
+		if err := rows.Scan(valuePtrs...); err != nil {
+			return nil, 0, fmt.Errorf("scanning row: %w", err)
+		}
+
+		row := make(map[string]any)
+		for i, col := range cols {
+			val := values[i]
+			if b, ok := val.([]byte); ok {
+				row[col] = string(b)
+			} else {
+				row[col] = val
+			}
+		}
+		results = append(results, row)
+	}
+	return results, total, nil
+}
+
 func sqlType(columnType string) string {
 	switch columnType {
 	case "string", "datetime": //TODO: add datetime as TEXT for now.

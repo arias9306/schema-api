@@ -11,6 +11,7 @@ import (
 
 	"github.com/arias9306/schema-api/api"
 	"github.com/arias9306/schema-api/db"
+	"github.com/arias9306/schema-api/endpoints"
 	"github.com/arias9306/schema-api/mock"
 	"github.com/arias9306/schema-api/schema"
 	"github.com/arias9306/schema-api/seed"
@@ -75,6 +76,8 @@ func main() {
 		}
 		fmt.Println("mock endpoints registered.")
 	}
+
+	endpoints.PrintTable(endpoints.Collect(schema))
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", *port),

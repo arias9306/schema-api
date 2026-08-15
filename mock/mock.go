@@ -5,6 +5,7 @@ package mock
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/rand"
 	"net/http"
 	"strings"
@@ -123,7 +124,9 @@ func writeError(w http.ResponseWriter, status int, format string, args ...any) {
 func writeJSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(value)
+	if err := json.NewEncoder(w).Encode(value); err != nil {
+		log.Printf("failed to encode response: %v", err)
+	}
 }
 
 type renderer struct {

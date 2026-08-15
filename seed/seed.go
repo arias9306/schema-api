@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/arias9306/schema-api/fakegen"
 	"github.com/arias9306/schema-api/schema"
 )
 
@@ -138,47 +139,9 @@ func topologicalSort(tables []schema.Table) ([]schema.Table, error) {
 
 func generateValue(randomizer *rand.Rand, column schema.Column, used map[string]bool) (any, error) {
 	for attempt := 0; ; attempt++ {
-		var value any
-
-		switch column.Type {
-		case "string":
-			value = generateString(randomizer, column)
-
-		case "int":
-			min := 0.0
-			max := 10000.0
-
-			if column.Min != nil {
-				min = *column.Min
-			}
-
-			if column.Max != nil {
-				max = *column.Max
-			}
-
-			value = int(min) + randomizer.Intn(int(max-min)+1)
-
-		case "float":
-
-			min := 0.0
-			max := 10000.0
-
-			if column.Min != nil {
-				min = *column.Min
-			}
-			if column.Max != nil {
-				max = *column.Max
-			}
-
-			value = float64(int((min+randomizer.Float64()*(max-min))*100)) / 100
-
-		case "bool":
-			value = randomizer.Intn(2) == 1
-
-		case "datetime":
-			days := randomizer.Intn(365 * 2)
-			t := time.Now().AddDate(0, 0, -days)
-			value = t.Format(time.RFC3339)
+		value, err := fakegen.Value(randomizer, columnToSpec(column))
+		if err != nil {
+			return nil, err
 		}
 
 		if column.Unique {
@@ -196,58 +159,17 @@ func generateValue(randomizer *rand.Rand, column schema.Column, used map[string]
 	}
 }
 
-func generateString(randomizer *rand.Rand, column schema.Column) string {
-
-	if format := resolveFormat(column); format != "" {
-		if generator, ok := formatGenerators[format]; ok {
-			value := generator(randomizer)
-			if !violatesExplicitLength(column, value) {
-				return value
-			}
-		}
+func columnToSpec(column schema.Column) fakegen.Spec {
+	return fakegen.Spec{
+		Type:      column.Type,
+		Min:       column.Min,
+		Max:       column.Max,
+		MinLength: column.MinLength,
+		MaxLength: column.MaxLength,
+		Regex:     column.Regex,
+		Format:    resolveFormat(column),
+		Default:   column.Default,
 	}
-
-	minLength := 5
-	maxLength := 30
-
-	if column.MinLength != nil {
-		minLength = *column.MinLength
-	}
-
-	if column.MaxLength != nil {
-		maxLength = *column.MaxLength
-	}
-
-	if minLength > maxLength {
-		minLength, maxLength = maxLength, minLength
-	}
-
-	length := minLength
-	if maxLength > minLength {
-		length += randomizer.Intn(maxLength - minLength + 1)
-	}
-
-	return randomString(randomizer, length)
-}
-
-func violatesExplicitLength(column schema.Column, value string) bool {
-	if column.MinLength != nil && len(value) < *column.MinLength {
-		return true
-	}
-	if column.MaxLength != nil && len(value) > *column.MaxLength {
-		return true
-	}
-
-	return false
-}
-
-func randomString(randomizer *rand.Rand, n int) string {
-	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = letters[randomizer.Intn(len(letters))]
-	}
-	return string(b)
 }
 
 func insertRow(db *sql.DB, tableName string, data map[string]any) (int64, error) {

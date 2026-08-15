@@ -7,8 +7,8 @@
           "name": "name",
           "type": "string",
           "required": true,
-          "minLength": 2,
-          "maxLength": 50
+          "min_length": 2,
+          "max_length": 50
         },
         { "name": "email", "type": "string", "unique": true },
         { "name": "age", "type": "int", "min": 18, "max": 120, "default": 18 },

@@ -62,6 +62,35 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, rows)
 }
 
+func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
+	tableName := r.PathValue("table")
+	_, ok := h.findTable(tableName)
+
+	if !ok {
+		writeError(w, http.StatusNotFound, "table not found: %s", tableName)
+		return
+	}
+
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+
+	row, err := db.SelectByID(h.db, tableName, id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "query failed: %v", err)
+		return
+	}
+
+	if row == nil {
+		writeError(w, http.StatusNotFound, "row not found")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, row)
+}
+
 func (h *Handler) findTable(name string) (schema.Table, bool) {
 	for _, table := range h.schema.Tables {
 		if table.Name == name {

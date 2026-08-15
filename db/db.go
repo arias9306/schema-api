@@ -112,6 +112,54 @@ func SelectAll(db *sql.DB, tableName string, page int, limit int, sort string, o
 	return results, total, nil
 }
 
+func SelectByID(db *sql.DB, tableName string, id int64) (map[string]any, error) {
+	query := fmt.Sprintf("SELECT * FROM %s WHERE id = ?", tableName)
+
+	rows, err := db.Query(query, id)
+	if err != nil {
+		return nil, fmt.Errorf("selecting from %s: %w", tableName, err)
+	}
+
+	defer rows.Close()
+
+	if !rows.Next() {
+		return nil, nil
+	}
+
+	return scanRow(rows)
+}
+
+func scanRow(rows *sql.Rows) (map[string]any, error) {
+	columns, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+
+	values := make([]any, len(columns))
+	valuePtrs := make([]any, len(columns))
+
+	for i := range values {
+		valuePtrs[i] = &values[i]
+	}
+
+	if err := rows.Scan(valuePtrs...); err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]any)
+	for i, column := range columns {
+		value := values[i]
+
+		if b, ok := value.([]byte); ok {
+			result[column] = string(b)
+		} else {
+			result[column] = value
+		}
+	}
+
+	return result, nil
+}
+
 func sqlType(columnType string) string {
 	switch columnType {
 	case "string", "datetime": //TODO: add datetime as TEXT for now.

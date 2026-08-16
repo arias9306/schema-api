@@ -50,16 +50,17 @@ test-race:
 	go test -race ./...
 
 coverage:
-	go test -coverprofile=/tmp/schema-api-cover.out ./...
-	@go tool cover -func=/tmp/schema-api-cover.out | tail -n 1
-	@go tool cover -html=/tmp/schema-api-cover.out -o /tmp/schema-api-cover.html
-	@echo "HTML coverage report written to /tmp/schema-api-cover.html"
+	@mkdir -p coverage
+	go test -coverprofile=coverage/coverage.out ./...
+	@go tool cover -func=coverage/coverage.out | tail -n 1
+	@go tool cover -html=coverage/coverage.out -o coverage/coverage.html
+	@echo "HTML coverage report written to coverage/coverage.html"
 
 lint:
 	golangci-lint run ./...
 
 clean:
-	rm -rf $(DIST_DIR)
+	rm -rf $(DIST_DIR) coverage
 
 changelog:
 	git cliff -o CHANGELOG.md

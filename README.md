@@ -50,7 +50,7 @@ Other useful targets:
 ```bash
 make test        # go test ./...
 make test-race   # go test -race ./...
-make coverage    # run tests with a coverage profile and open the HTML report
+make coverage    # run tests with a coverage profile and HTML report in coverage/
 make clean       # remove dist/
 ```
 

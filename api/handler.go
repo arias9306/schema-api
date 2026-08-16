@@ -4,23 +4,32 @@ package api
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/arias9306/schema-api/db"
 	"github.com/arias9306/schema-api/schema"
 	"github.com/arias9306/schema-api/validation"
+	"modernc.org/sqlite"
+	sqlite3 "modernc.org/sqlite/lib"
 )
+
+const maxBodyBytes = 1 << 20
 
 type Handler struct {
 	db     *sql.DB
-	schema *schema.Schema
+	tables map[string]schema.Table
 }
 
-func NewAPIHandler(database *sql.DB, schema *schema.Schema) *Handler {
-	return &Handler{db: database, schema: schema}
+func NewAPIHandler(database *sql.DB, sch *schema.Schema) *Handler {
+	tables := make(map[string]schema.Table, len(sch.Tables))
+	for _, table := range sch.Tables {
+		tables[table.Name] = table
+	}
+	return &Handler{db: database, tables: tables}
 }
 
 func (h *Handler) Register(mux *http.ServeMux) {
@@ -33,7 +42,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	tableName := r.PathValue("table")
-	table, ok := h.findTable(tableName)
+	table, ok := h.tables[tableName]
 
 	if !ok {
 		writeError(w, http.StatusNotFound, "table not found: %s", tableName)
@@ -47,15 +56,15 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	if limit < 1 || limit > 100 {
-		limit = 20 // increase the limit?
+		limit = 20
 	}
 
 	sort := r.URL.Query().Get("sort")
 	order := r.URL.Query().Get("order")
 
-	rows, total, err := db.SelectAll(h.db, table.Name, page, limit, sort, order)
+	rows, total, err := db.SelectAll(h.db, table, page, limit, sort, order)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "query failied: %v", err)
+		writeError(w, http.StatusInternalServerError, "query failed: %v", err)
 		return
 	}
 
@@ -67,7 +76,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	tableName := r.PathValue("table")
-	_, ok := h.findTable(tableName)
+	table, ok := h.tables[tableName]
 
 	if !ok {
 		writeError(w, http.StatusNotFound, "table not found: %s", tableName)
@@ -80,7 +89,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	row, err := db.SelectByID(h.db, tableName, id)
+	row, err := db.SelectByID(h.db, table, id)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "query failed: %v", err)
 		return
@@ -96,12 +105,14 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	tableName := r.PathValue("table")
-	table, ok := h.findTable(tableName)
+	table, ok := h.tables[tableName]
 
 	if !ok {
 		writeError(w, http.StatusNotFound, "table not found: %s", tableName)
 		return
 	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
 
 	var data map[string]any
 	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
@@ -117,21 +128,16 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	id, err := db.Insert(h.db, table, cleaned)
 	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE constraint") {
-			writeError(w, http.StatusConflict, "unique constraint violation")
+		if errCode := constraintCode(err); errCode != nil {
+			writeConstraintError(w, *errCode)
 			return
 		}
 
-		if strings.Contains(err.Error(), "FOREIGN KEY constraint") {
-			writeError(w, http.StatusBadRequest, "foreign key violation")
-			return
-		}
-
-		writeError(w, http.StatusInternalServerError, "failed to retrieve create row")
+		writeError(w, http.StatusInternalServerError, "failed to insert row: %v", err)
 		return
 	}
 
-	row, err := db.SelectByID(h.db, tableName, id)
+	row, err := db.SelectByID(h.db, table, id)
 	if err != nil || row == nil {
 		writeError(w, http.StatusInternalServerError, "failed to retrieve created row")
 		return
@@ -142,7 +148,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	tableName := r.PathValue("table")
-	table, ok := h.findTable(tableName)
+	table, ok := h.tables[tableName]
 	if !ok {
 		writeError(w, http.StatusNotFound, "table not found: %s", tableName)
 		return
@@ -151,9 +157,10 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid id")
+		return
 	}
 
-	existing, err := db.SelectByID(h.db, tableName, id)
+	existing, err := db.SelectByID(h.db, table, id)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "query failed: %v", err)
 		return
@@ -162,6 +169,8 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "row not found")
 		return
 	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
 
 	var data map[string]any
 	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
@@ -176,12 +185,8 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := db.Update(h.db, table, id, data); err != nil {
-		if strings.Contains(err.Error(), "UNIQUE constraint") {
-			writeError(w, http.StatusConflict, "unique constraint violation")
-			return
-		}
-		if strings.Contains(err.Error(), "FOREIGN KEY constraint") {
-			writeError(w, http.StatusBadRequest, "foreign key violation")
+		if errCode := constraintCode(err); errCode != nil {
+			writeConstraintError(w, *errCode)
 			return
 		}
 
@@ -189,9 +194,9 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	row, err := db.SelectByID(h.db, tableName, id)
+	row, err := db.SelectByID(h.db, table, id)
 	if err != nil || row == nil {
-		writeError(w, http.StatusInternalServerError, "failed to retrieve update rows")
+		writeError(w, http.StatusInternalServerError, "failed to retrieve updated row")
 		return
 	}
 
@@ -200,7 +205,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	tableName := r.PathValue("table")
-	if _, ok := h.findTable(tableName); !ok {
+	if _, ok := h.tables[tableName]; !ok {
 		writeError(w, http.StatusNotFound, "table not found: %s", tableName)
 		return
 	}
@@ -212,14 +217,20 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := db.Delete(h.db, tableName, id); err != nil {
-		if strings.Contains(err.Error(), "row not found") {
+		if errCode := constraintCode(err); errCode != nil {
+			if *errCode == sqlite3.SQLITE_CONSTRAINT_FOREIGNKEY {
+				writeError(w, http.StatusConflict, "cannot delete: referenced by other rows")
+				return
+			}
+			writeConstraintError(w, *errCode)
+			return
+		}
+
+		if errors.Is(err, db.ErrRowNotFound) {
 			writeError(w, http.StatusNotFound, "row not found")
 			return
 		}
-		if strings.Contains(err.Error(), "FOREIGN KEY constraint") {
-			writeError(w, http.StatusConflict, "cannot delete: referenced by other rows")
-			return
-		}
+
 		writeError(w, http.StatusInternalServerError, "delete failed: %v", err)
 		return
 	}
@@ -227,13 +238,32 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *Handler) findTable(name string) (schema.Table, bool) {
-	for _, table := range h.schema.Tables {
-		if table.Name == name {
-			return table, true
-		}
+func constraintCode(err error) *int {
+	var sqliteErr *sqlite.Error
+	if !errors.As(err, &sqliteErr) {
+		return nil
 	}
-	return schema.Table{}, false
+
+	code := sqliteErr.Code()
+	switch code {
+	case sqlite3.SQLITE_CONSTRAINT_UNIQUE, sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY, sqlite3.SQLITE_CONSTRAINT_NOTNULL, sqlite3.SQLITE_CONSTRAINT_CHECK:
+		return &code
+	case sqlite3.SQLITE_CONSTRAINT_FOREIGNKEY:
+		return &code
+	}
+
+	return nil
+}
+
+func writeConstraintError(w http.ResponseWriter, code int) {
+	switch code {
+	case sqlite3.SQLITE_CONSTRAINT_UNIQUE, sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY:
+		writeError(w, http.StatusConflict, "unique constraint violation")
+	case sqlite3.SQLITE_CONSTRAINT_FOREIGNKEY:
+		writeError(w, http.StatusBadRequest, "foreign key violation")
+	default:
+		writeError(w, http.StatusBadRequest, "constraint violation")
+	}
 }
 
 func writeError(w http.ResponseWriter, status int, format string, args ...any) {
@@ -244,5 +274,7 @@ func writeError(w http.ResponseWriter, status int, format string, args ...any) {
 func writeJSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(value)
+	if err := json.NewEncoder(w).Encode(value); err != nil {
+		log.Printf("failed to encode response: %v", err)
+	}
 }

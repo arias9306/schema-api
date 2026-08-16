@@ -3,12 +3,15 @@ package db
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/arias9306/schema-api/schema"
 	_ "modernc.org/sqlite"
 )
+
+var ErrRowNotFound = errors.New("row not found")
 
 func InitDB(path string) (*sql.DB, error) {
 	db, err := sql.Open("sqlite", path)
@@ -27,7 +30,7 @@ func CreateTable(db *sql.DB, table schema.Table) error {
 	cols := []string{"id INTEGER PRIMARY KEY AUTOINCREMENT"}
 
 	for _, column := range table.Columns {
-		columnDef := fmt.Sprintf("%s %s", column.Name, sqlType(column.Type))
+		columnDef := quoteIdent(column.Name) + " " + sqlType(column.Type)
 
 		if column.Required {
 			columnDef += " NOT NULL"
@@ -37,10 +40,18 @@ func CreateTable(db *sql.DB, table schema.Table) error {
 			columnDef += " UNIQUE"
 		}
 
+		if column.ForeignKey != nil {
+			refColumn := column.ForeignKey.Column
+			if refColumn == "" {
+				refColumn = "id"
+			}
+			columnDef += " REFERENCES " + quoteIdent(column.ForeignKey.Table) + " (" + quoteIdent(refColumn) + ")"
+		}
+
 		cols = append(cols, columnDef)
 	}
 
-	query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n %s\n)", table.Name, strings.Join(cols, ",\n "))
+	query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n %s\n)", quoteIdent(table.Name), strings.Join(cols, ",\n "))
 
 	_, err := db.Exec(query)
 	if err != nil {
@@ -50,33 +61,24 @@ func CreateTable(db *sql.DB, table schema.Table) error {
 	return nil
 }
 
-func SelectAll(db *sql.DB, tableName string, page int, limit int, sort string, order string) ([]map[string]any, int, error) {
-	countQuery := fmt.Sprintf("SELECT COUNT(1) FROM %s", tableName)
+func SelectAll(db *sql.DB, table schema.Table, page int, limit int, sort string, order string) ([]map[string]any, int, error) {
+	countQuery := fmt.Sprintf("SELECT COUNT(1) FROM %s", quoteIdent(table.Name))
 
 	var total int
 	if err := db.QueryRow(countQuery).Scan(&total); err != nil {
-		return nil, 0, fmt.Errorf("counting %s: %w", tableName, err)
+		return nil, 0, fmt.Errorf("counting %s: %w", table.Name, err)
 	}
 
-	if sort == "" {
-		sort = "id"
-	}
-
-	if order == "" {
-		order = "asc"
-	}
-	order = strings.ToLower(order)
-	if order != "asc" && order != "desc" {
-		order = "asc"
-	}
+	sort = sanitizeSort(table, sort)
+	order = sanitizeOrder(order)
 
 	offset := (page - 1) * limit
 
-	query := fmt.Sprintf("SELECT * FROM %s ORDER BY %s %s LIMIT ? OFFSET ?", tableName, sort, order)
+	query := fmt.Sprintf("SELECT * FROM %s ORDER BY %s %s LIMIT ? OFFSET ?", quoteIdent(table.Name), quoteIdent(sort), order)
 
 	rows, err := db.Query(query, limit, offset)
 	if err != nil {
-		return nil, 0, fmt.Errorf("querying %s: %w", tableName, err)
+		return nil, 0, fmt.Errorf("querying %s: %w", table.Name, err)
 	}
 
 	defer rows.Close()
@@ -101,24 +103,19 @@ func SelectAll(db *sql.DB, tableName string, page int, limit int, sort string, o
 
 		row := make(map[string]any)
 		for i, col := range cols {
-			val := values[i]
-			if b, ok := val.([]byte); ok {
-				row[col] = string(b)
-			} else {
-				row[col] = val
-			}
+			row[col] = convertValue(col, values[i], table)
 		}
 		results = append(results, row)
 	}
 	return results, total, nil
 }
 
-func SelectByID(db *sql.DB, tableName string, id int64) (map[string]any, error) {
-	query := fmt.Sprintf("SELECT * FROM %s WHERE id = ?", tableName)
+func SelectByID(db *sql.DB, table schema.Table, id int64) (map[string]any, error) {
+	query := fmt.Sprintf("SELECT * FROM %s WHERE id = ?", quoteIdent(table.Name))
 
 	rows, err := db.Query(query, id)
 	if err != nil {
-		return nil, fmt.Errorf("selecting from %s: %w", tableName, err)
+		return nil, fmt.Errorf("selecting from %s: %w", table.Name, err)
 	}
 
 	defer rows.Close()
@@ -127,7 +124,7 @@ func SelectByID(db *sql.DB, tableName string, id int64) (map[string]any, error) 
 		return nil, nil
 	}
 
-	return scanRow(rows)
+	return scanRow(rows, table)
 }
 
 func Insert(db *sql.DB, table schema.Table, data map[string]any) (int64, error) {
@@ -136,7 +133,7 @@ func Insert(db *sql.DB, table schema.Table, data map[string]any) (int64, error) 
 
 	for _, column := range table.Columns {
 		if value, ok := data[column.Name]; ok {
-			columns = append(columns, column.Name)
+			columns = append(columns, quoteIdent(column.Name))
 			values = append(values, value)
 		}
 	}
@@ -146,7 +143,7 @@ func Insert(db *sql.DB, table schema.Table, data map[string]any) (int64, error) 
 		placeholders[i] = "?"
 	}
 
-	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", table.Name, strings.Join(columns, ", "), strings.Join(placeholders, ", "))
+	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", quoteIdent(table.Name), strings.Join(columns, ", "), strings.Join(placeholders, ", "))
 
 	result, err := db.Exec(query, values...)
 	if err != nil {
@@ -162,7 +159,7 @@ func Update(db *sql.DB, table schema.Table, id int64, data map[string]any) error
 
 	for _, column := range table.Columns {
 		if value, ok := data[column.Name]; ok {
-			sets = append(sets, fmt.Sprintf("%s = ?", column.Name))
+			sets = append(sets, fmt.Sprintf("%s = ?", quoteIdent(column.Name)))
 			values = append(values, value)
 		}
 	}
@@ -172,7 +169,7 @@ func Update(db *sql.DB, table schema.Table, id int64, data map[string]any) error
 	}
 
 	values = append(values, id)
-	query := fmt.Sprintf("UPDATE %s SET %s WHERE id = ?", table.Name, strings.Join(sets, ", "))
+	query := fmt.Sprintf("UPDATE %s SET %s WHERE id = ?", quoteIdent(table.Name), strings.Join(sets, ", "))
 
 	_, err := db.Exec(query, values...)
 	if err != nil {
@@ -183,7 +180,7 @@ func Update(db *sql.DB, table schema.Table, id int64, data map[string]any) error
 }
 
 func Delete(db *sql.DB, tableName string, id int64) error {
-	query := fmt.Sprintf("DELETE FROM %s WHERE id = ?", tableName)
+	query := fmt.Sprintf("DELETE FROM %s WHERE id = ?", quoteIdent(tableName))
 	result, err := db.Exec(query, id)
 
 	if err != nil {
@@ -192,13 +189,13 @@ func Delete(db *sql.DB, tableName string, id int64) error {
 
 	affected, _ := result.RowsAffected()
 	if affected == 0 {
-		return fmt.Errorf("row not found")
+		return fmt.Errorf("deleting %s: %w", tableName, ErrRowNotFound)
 	}
 
 	return nil
 }
 
-func scanRow(rows *sql.Rows) (map[string]any, error) {
+func scanRow(rows *sql.Rows, table schema.Table) (map[string]any, error) {
 	columns, err := rows.Columns()
 	if err != nil {
 		return nil, err
@@ -217,16 +214,57 @@ func scanRow(rows *sql.Rows) (map[string]any, error) {
 
 	result := make(map[string]any)
 	for i, column := range columns {
-		value := values[i]
-
-		if b, ok := value.([]byte); ok {
-			result[column] = string(b)
-		} else {
-			result[column] = value
-		}
+		result[column] = convertValue(column, values[i], table)
 	}
 
 	return result, nil
+}
+
+func sanitizeSort(table schema.Table, sort string) string {
+	if sort == "id" {
+		return "id"
+	}
+
+	for _, column := range table.Columns {
+		if column.Name == sort {
+			return sort
+		}
+	}
+
+	return "id"
+}
+
+func sanitizeOrder(order string) string {
+	if order == "" {
+		return "asc"
+	}
+
+	order = strings.ToLower(order)
+	if order != "asc" && order != "desc" {
+		return "asc"
+	}
+
+	return order
+}
+
+func convertValue(colName string, value any, table schema.Table) any {
+	if b, ok := value.([]byte); ok {
+		value = string(b)
+	}
+
+	for _, column := range table.Columns {
+		if column.Name == colName && column.Type == "bool" {
+			if n, ok := value.(int64); ok {
+				return n != 0
+			}
+		}
+	}
+
+	return value
+}
+
+func quoteIdent(name string) string {
+	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }
 
 func sqlType(columnType string) string {

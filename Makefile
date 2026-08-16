@@ -4,6 +4,7 @@ OS_LIST     := linux windows darwin
 ARCH_LIST   := amd64 arm64
 GOFLAGS     := -trimpath
 PKG         := github.com/arias9306/schema-api
+DOC_FILES   := README.md LICENSE
 
 VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT     ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
@@ -14,7 +15,7 @@ LDFLAGS = -s -w \
 	-X $(PKG)/version.Commit=$(COMMIT) \
 	-X $(PKG)/version.BuildDate=$(BUILD_DATE)
 
-.PHONY: all build test clean changelog changelog-unreleased
+.PHONY: all build test test-race coverage lint clean changelog changelog-unreleased
 
 all: build
 
@@ -31,10 +32,11 @@ build:
 			GOOS=$$os GOARCH=$$arch CGO_ENABLED=0 \
 			go build $(GOFLAGS) -ldflags "$(LDFLAGS)" \
 				-o "$$staging/$(BINARY_NAME)$$ext" .; \
+			cp $(DOC_FILES) "$$staging/"; \
 			if [ "$$os" = "windows" ]; then \
-				(cd "$$staging" && zip -q "$$archive.zip" "$(BINARY_NAME).exe"); \
+				(cd "$$staging" && zip -q "$$archive.zip" "$(BINARY_NAME).exe" $(DOC_FILES)); \
 			else \
-				tar -czf "$$archive.tar.gz" -C "$$staging" "$(BINARY_NAME)"; \
+				tar -czf "$$archive.tar.gz" -C "$$staging" "$(BINARY_NAME)" $(DOC_FILES); \
 			fi; \
 			rm -rf "$$staging"; \
 		done; \
@@ -44,8 +46,21 @@ build:
 test:
 	go test ./...
 
+test-race:
+	go test -race ./...
+
+coverage:
+	@mkdir -p coverage
+	go test -coverprofile=coverage/coverage.out ./...
+	@go tool cover -func=coverage/coverage.out | tail -n 1
+	@go tool cover -html=coverage/coverage.out -o coverage/coverage.html
+	@echo "HTML coverage report written to coverage/coverage.html"
+
+lint:
+	golangci-lint run ./...
+
 clean:
-	rm -rf $(DIST_DIR)
+	rm -rf $(DIST_DIR) coverage
 
 changelog:
 	git cliff -o CHANGELOG.md

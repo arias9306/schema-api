@@ -5,15 +5,16 @@ import (
 	"database/sql"
 	"fmt"
 	"math/rand"
-	"strings"
 	"time"
 
+	"github.com/arias9306/schema-api/db"
+	"github.com/arias9306/schema-api/fakegen"
 	"github.com/arias9306/schema-api/schema"
 )
 
 const maxUniqueAttempts = 1000
 
-func Seed(db *sql.DB, schema *schema.Schema, rowPerTable int) error {
+func Seed(database *sql.DB, schema *schema.Schema, rowPerTable int) error {
 	topologicalList, err := topologicalSort(schema.Tables)
 
 	if err != nil {
@@ -61,7 +62,7 @@ func Seed(db *sql.DB, schema *schema.Schema, rowPerTable int) error {
 			}
 
 			// Insert Row
-			id, err := insertRow(db, table.Name, row)
+			id, err := db.Insert(database, table, row)
 			if err != nil {
 				return fmt.Errorf("seeding %s row %d: %w", table.Name, i, err)
 			}
@@ -130,7 +131,7 @@ func topologicalSort(tables []schema.Table) ([]schema.Table, error) {
 	}
 
 	if len(result) != len(tables) {
-		return nil, fmt.Errorf("circula dependency detected")
+		return nil, fmt.Errorf("circular dependency detected")
 	}
 
 	return result, nil
@@ -138,47 +139,9 @@ func topologicalSort(tables []schema.Table) ([]schema.Table, error) {
 
 func generateValue(randomizer *rand.Rand, column schema.Column, used map[string]bool) (any, error) {
 	for attempt := 0; ; attempt++ {
-		var value any
-
-		switch column.Type {
-		case "string":
-			value = generateString(randomizer, column)
-
-		case "int":
-			min := 0.0
-			max := 10000.0
-
-			if column.Min != nil {
-				min = *column.Min
-			}
-
-			if column.Max != nil {
-				max = *column.Max
-			}
-
-			value = int(min) + randomizer.Intn(int(max-min)+1)
-
-		case "float":
-
-			min := 0.0
-			max := 10000.0
-
-			if column.Min != nil {
-				min = *column.Min
-			}
-			if column.Max != nil {
-				max = *column.Max
-			}
-
-			value = float64(int((min+randomizer.Float64()*(max-min))*100)) / 100
-
-		case "bool":
-			value = randomizer.Intn(2) == 1
-
-		case "datetime":
-			days := randomizer.Intn(365 * 2)
-			t := time.Now().AddDate(0, 0, -days)
-			value = t.Format(time.RFC3339)
+		value, err := fakegen.Value(randomizer, columnToSpec(column))
+		if err != nil {
+			return nil, err
 		}
 
 		if column.Unique {
@@ -196,92 +159,15 @@ func generateValue(randomizer *rand.Rand, column schema.Column, used map[string]
 	}
 }
 
-func generateString(randomizer *rand.Rand, column schema.Column) string {
-
-	if format := resolveFormat(column); format != "" {
-		if generator, ok := formatGenerators[format]; ok {
-			value := generator(randomizer)
-			if !violatesExplicitLength(column, value) {
-				return value
-			}
-		}
+func columnToSpec(column schema.Column) fakegen.Spec {
+	return fakegen.Spec{
+		Type:      column.Type,
+		Min:       column.Min,
+		Max:       column.Max,
+		MinLength: column.MinLength,
+		MaxLength: column.MaxLength,
+		Regex:     column.Regex,
+		Format:    resolveFormat(column),
+		Default:   column.Default,
 	}
-
-	minLength := 5
-	maxLength := 30
-
-	if column.MinLength != nil {
-		minLength = *column.MinLength
-	}
-
-	if column.MaxLength != nil {
-		maxLength = *column.MaxLength
-	}
-
-	if minLength > maxLength {
-		minLength, maxLength = maxLength, minLength
-	}
-
-	length := minLength
-	if maxLength > minLength {
-		length += randomizer.Intn(maxLength - minLength + 1)
-	}
-
-	return randomString(randomizer, length)
-}
-
-func violatesExplicitLength(column schema.Column, value string) bool {
-	if column.MinLength != nil && len(value) < *column.MinLength {
-		return true
-	}
-	if column.MaxLength != nil && len(value) > *column.MaxLength {
-		return true
-	}
-
-	return false
-}
-
-func randomString(randomizer *rand.Rand, n int) string {
-	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = letters[randomizer.Intn(len(letters))]
-	}
-	return string(b)
-}
-
-func insertRow(db *sql.DB, tableName string, data map[string]any) (int64, error) {
-	columns := make([]string, 0, len(data))
-	values := make([]any, 0, len(data))
-
-	for key, value := range data {
-		columns = append(columns, key)
-		values = append(values, value)
-	}
-
-	placholders := make([]string, len(columns))
-
-	for i := range placholders {
-		placholders[i] = "?"
-	}
-
-	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", tableName, joinColumns(columns), joinColumns(placholders))
-
-	result, err := db.Exec(query, values...)
-	if err != nil {
-		return 0, err
-	}
-
-	return result.LastInsertId()
-}
-
-func joinColumns(columns []string) string {
-	var s strings.Builder
-	for i, column := range columns {
-		if i > 0 {
-			s.WriteString(", ")
-		}
-		s.WriteString(column)
-	}
-	return s.String()
 }

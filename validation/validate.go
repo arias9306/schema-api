@@ -3,6 +3,7 @@ package validation
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"strings"
 	"time"
@@ -96,17 +97,21 @@ func validateColumn(column schema.Column, value any) string {
 			return fmt.Sprintf("length must be at least %d", *column.MinLength)
 		}
 
-		if column.MaxLength != nil && len(s) < *column.MaxLength {
+		if column.MaxLength != nil && len(s) > *column.MaxLength {
 			return fmt.Sprintf("length must be at most %d", *column.MaxLength)
 		}
 
 		if column.Regex != "" {
-			marched, err := regexp.MatchString(column.Regex, s)
-			if err != nil {
-				return fmt.Sprintf("regex error: %v", err)
+			pattern := column.RegexCompiled
+			if pattern == nil {
+				compiled, err := regexp.Compile(column.Regex)
+				if err != nil {
+					return fmt.Sprintf("regex error: %v", err)
+				}
+				pattern = compiled
 			}
 
-			if !marched {
+			if !pattern.MatchString(s) {
 				return "does not match pattern"
 			}
 		}
@@ -114,6 +119,10 @@ func validateColumn(column schema.Column, value any) string {
 		f, ok := value.(float64)
 		if !ok {
 			return "must be a number"
+		}
+
+		if f != math.Trunc(f) {
+			return "must be an integer"
 		}
 
 		v := int(f)
@@ -150,7 +159,7 @@ func validateColumn(column schema.Column, value any) string {
 			return "must be a string"
 		}
 
-		formats := []string{time.RFC3339, "1993-05-06 10:03:06", "2019-06-12"}
+		formats := []string{time.RFC3339, "2006-01-02 15:04:05", "2006-01-02"}
 		valid := false
 
 		for _, format := range formats {

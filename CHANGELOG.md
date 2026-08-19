@@ -5,11 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.3] - 2026-08-19
+
+### Added
+
+- Add MIT License to the project
+- Add fake data generation and mock endpoint handling
+- Implement endpoint collection and printing functionality
+- Add linting target to Makefile
+- Add error handling for JSON encoding in writeJSON function
+- Add CORS support and improve server shutdown handling with request logging
+- Add CORS origin flag to server configuration in README
+- Add race testing and coverage targets to Makefile; enhance endpoint printing with formatted output
+- Add tests for schema validation, rendering, and seeding functionality
+
+### Changed
+
+- Include documentation files in build artifacts
+- Enhance schema validation and add endpoint support
+- Update README
+- Improve output formatting for endpoints and server messages
+- Handle edge cases in random value generation for integers and floats
+- Update Seed function to use database interface and remove insertRow helper
+- Enhance schema validation with comprehensive checks for tables and columns
+- Enhance CreateTable and query functions with proper identifier quoting and foreign key support
+- Improve handler structure and error handling in API methods
+- Update Makefile to generate coverage reports in a dedicated directory
+- Merge pull request #1 from arias9306/endpoints-support
+- Merge pull request #2 from arias9306/testing
+
+### Fixed
+
+- Correct validation logic for string length and regex matching in validateColumn function
+
 ## [0.0.2] - 2026-08-15
 
 ### Added
 
 - Add CORS support to the HTTP server
+
+### Changed
+
+- Update changelog for v0.0.2
 
 ## [0.0.1] - 2026-08-15
 
@@ -45,6 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Correct receiver name in HasErrors method for consistency
 - Correct property names for min_length and max_length in users table
 
+[0.0.3]: https://github.com/arias9306/schema-api/compare/v0.0.2..v0.0.3
 [0.0.2]: https://github.com/arias9306/schema-api/compare/v0.0.1..v0.0.2
 [0.0.1]: https://github.com/arias9306/schema-api/releases/tag/v0.0.1
 

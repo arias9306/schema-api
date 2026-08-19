@@ -1,0 +1,37 @@
+{
+  "tables": [
+    {
+      "name": "users",
+      "columns": [
+        {"name": "name",     "type": "string",   "format": "name"},
+        {"name": "email",    "type": "string",   "unique": true},
+        {"name": "username", "type": "string",   "unique": true},
+        {"name": "phone",    "type": "string",   "format": "phone"},
+        {"name": "city",     "type": "string",   "format": "city"},
+        {"name": "country",  "type": "string",   "format": "country"},
+        {"name": "active",   "type": "bool"}
+      ]
+    },
+    {
+      "name": "products",
+      "columns": [
+        {"name": "title",     "type": "string", "min_length": 5, "max_length": 100},
+        {"name": "price",     "type": "float",  "min": 1.0, "max": 9999.99},
+        {"name": "stock",     "type": "int",    "min": 0, "max": 1000},
+        {"name": "image_url", "type": "string", "format": "url"},
+        {"name": "available", "type": "bool"}
+      ]
+    },
+    {
+      "name": "orders",
+      "columns": [
+        {"name": "user_id",    "type": "int", "foreign_key": {"table": "users", "column": "id"}},
+        {"name": "product_id", "type": "int", "foreign_key": {"table": "products", "column": "id"}},
+        {"name": "quantity",   "type": "int", "min": 1, "max": 100},
+        {"name": "total",      "type": "float", "min": 1.0, "max": 50000.0},
+        {"name": "status",     "type": "string", "regex": "pending|shipped|delivered|cancelled"},
+        {"name": "created_at", "type": "datetime", "default": "now"}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,79 @@
+{
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/v1/users/{id}/profile",
+      "response": {
+        "status": 200,
+        "body": {
+          "id":    {"type": "int", "min": 1, "max": 999},
+          "name":  {"type": "string", "format": "name"},
+          "email": {"type": "string", "format": "email"},
+          "requested_user_id": "{{path.id}}",
+          "avatar_url": {"type": "string", "format": "url"},
+          "tags": {"type": "array", "count": 3, "items": {"type": "string", "min_length": 4, "max_length": 8}},
+          "address": {
+            "street": {"type": "string", "format": "address"},
+            "city":   {"type": "string", "format": "city"},
+            "state":  "Bogota"
+          }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/search",
+      "response": {
+        "status": 200,
+        "body": {
+          "query":    "{{query.q}}",
+          "category": "{{query.category}}",
+          "results": {
+            "type": "array",
+            "count": 5,
+            "items": {
+              "title": {"type": "string", "min_length": 10, "max_length": 40},
+              "score": {"type": "float", "min": 0.0, "max": 1.0}
+            }
+          },
+          "total": {"type": "int", "min": 10, "max": 1000}
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orders",
+      "response": {
+        "status": 201,
+        "body": {
+          "order_id":   {"type": "string", "min_length": 36, "max_length": 36},
+          "customer":   "{{body.customer_name}}",
+          "total":      {"type": "float", "min": 10, "max": 500},
+          "status":     "pending",
+          "created_at": {"type": "datetime"},
+          "items": {
+            "type": "array",
+            "count": 3,
+            "items": {
+              "product": {"type": "string", "min_length": 5, "max_length": 20},
+              "qty":     {"type": "int", "min": 1, "max": 5},
+              "price":   {"type": "float", "min": 5, "max": 100}
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health",
+      "response": {
+        "status": 200,
+        "body": {
+          "status":    "healthy",
+          "timestamp": {"type": "datetime"},
+          "version":   "1.0.0"
+        }
+      }
+    }
+  ]
+}

@@ -4,27 +4,27 @@ A schema-driven REST API server written in Go. Define your database tables in a
 simple JSON schema file, and `schema-api` creates an in-memory SQLite database,
 seeds it with realistic sample data, and exposes full CRUD endpoints backed by
 schema-aware validation. You can also declare explicit mock endpoints that serve
-templated JSON responses — either on their own or alongside tables.
+templated JSON responses either on their own or alongside tables.
 
 ## Features
 
-- **Schema-driven tables** — describe tables and columns in a single JSON file
-- **In-memory SQLite** — tables are created automatically on startup
-- **Realistic sample data** — built-in generators for names, emails, phones,
+- **Schema-driven tables**: describe tables and columns in a single JSON file
+- **In-memory SQLite**: tables are created automatically on startup
+- **Realistic sample data**: built-in generators for names, emails, phones,
   addresses, credit cards, IBANs, IP addresses, coordinates, lorem text,
   UUIDs, and more
-- **Foreign keys** — seeds rows in dependency order and honors FK references
-- **Full CRUD API** — list, get, create, update, and delete rows
-- **Input validation** — type checks, numeric ranges, string lengths, regex
+- **Foreign keys**: seeds rows in dependency order and honors FK references
+- **Full CRUD API**: list, get, create, update, and delete rows
+- **Input validation**: type checks, numeric ranges, string lengths, regex
   patterns, required fields, and defaults
-- **Pagination & sorting** — `page`, `limit`, `sort`, and `order` query params
-- **Constraint handling** — returns proper HTTP codes for unique and foreign
+- **Pagination & sorting**: `page`, `limit`, `sort`, and `order` query params
+- **Constraint handling**: returns proper HTTP codes for unique and foreign
   key violations
-- **Mock endpoints** — declare explicit routes (method, path, status, headers,
+- **Mock endpoints**: declare explicit routes (method, path, status, headers,
   and templated responses) alongside or instead of tables
-- **Response templating** — generate fields with the shared fake generators or
+- **Response templating**: generate fields with the shared fake generators or
   interpolate path, query, header, and request-body values into responses
-- **Cross-platform builds** — versioned archives for Linux, macOS, and Windows
+- **Cross-platform builds**: versioned archives for Linux, macOS, and Windows
   (amd64 and arm64) via the `Makefile`
 
 ## Requirements
@@ -196,33 +196,33 @@ from the column name (e.g. a column named `email` generates emails).
 | `lastname`        | Last name                            | `last_name`                                        |
 | `username`        | Username                             | `user_name`                                        |
 | `email`           | Email address                        | `user_email`                                       |
-| `phone`           | Phone number                         | —                                                  |
-| `address`         | Street address                       | —                                                  |
-| `city`            | City                                 | —                                                  |
-| `country`         | Country                              | —                                                  |
-| `url`             | URL                                  | —                                                  |
-| `uuid`            | UUID v4                              | —                                                  |
+| `phone`           | Phone number                         | -                                                  |
+| `address`         | Street address                       | -                                                  |
+| `city`            | City                                 | -                                                  |
+| `country`         | Country                              | -                                                  |
+| `url`             | URL                                  | -                                                  |
+| `uuid`            | UUID v4                              | -                                                  |
 | `credit_card`     | 16-digit card number (Luhn-valid)    | `card_number`                                      |
 | `hex_color`       | Hex color code (e.g. `#A1B2C3`)      | `color`                                            |
 | `ipv4`            | IPv4 address                         | `ip_address`                                       |
-| `ipv6`            | IPv6 address                         | —                                                  |
-| `mac_address`     | MAC address                          | —                                                  |
-| `mime_type`       | MIME type (e.g. `application/json`)  | —                                                  |
+| `ipv6`            | IPv6 address                         | -                                                  |
+| `mac_address`     | MAC address                          | -                                                  |
+| `mime_type`       | MIME type (e.g. `application/json`)  | -                                                  |
 | `file_extension`  | File extension including dot         | `file_ext`, `extension`                            |
 | `currency_amount` | Dollar amount (e.g. `$123.45`)       | `price`, `amount`, `total`                         |
-| `product_name`    | Fake product name                    | —                                                  |
+| `product_name`    | Fake product name                    | -                                                  |
 | `slug`            | Hyphenated URL slug                  | `url_slug`                                         |
-| `word`            | Single lorem word                    | —                                                  |
-| `isbn`            | ISBN-13 with valid check digit       | —                                                  |
+| `word`            | Single lorem word                    | -                                                  |
+| `isbn`            | ISBN-13 with valid check digit       | -                                                  |
 | `lat`             | Latitude between `-90` and `90`      | `latitude`                                         |
 | `lng`             | Longitude between `-180` and `180`   | `longitude`                                        |
 | `timezone`        | IANA timezone (e.g. `Europe/Madrid`) | `tz`                                               |
-| `job_title`       | Job title                            | —                                                  |
+| `job_title`       | Job title                            | -                                                  |
 | `company`         | Company name                         | `company_name`                                     |
 | `iban`            | IBAN with mod-97 check digits        | `account_number`                                   |
 | `date`            | Date in `YYYY-MM-DD` format          | `birth_date`, `dob`                                |
 | `lorem`           | Lorem ipsum phrase                   | `description`, `bio`, `summary`, `body`, `content` |
-| `sentence`        | Capitalized sentence ending in `.`   | —                                                  |
+| `sentence`        | Capitalized sentence ending in `.`   | -                                                  |
 
 Matching is substring-based, so a column named `card_number` resolves to the
 `credit_card` generator. Use type `datetime` for RFC3339 timestamps; `date`
@@ -231,7 +231,7 @@ produces a plain `YYYY-MM-DD` string.
 ## Mock endpoints
 
 In addition to (or instead of) tables, you can declare an `endpoints` array.
-Each entry defines an explicit route that serves a generated JSON response —
+Each entry defines an explicit route that serves a generated JSON response,
 no database involved.
 
 ```json
@@ -298,11 +298,11 @@ curl -s "http://localhost:8080/users/42/stats?page=3" -H "X-Mock: true"
 
 The `response` value is walked recursively:
 
-- **Literals** — plain strings, numbers, booleans, `null`, and arrays are
+- **Literals**: plain strings, numbers, booleans, `null`, and arrays are
   returned as-is.
-- **Nested objects** — objects without a `type` key are template objects,
+- **Nested objects**: objects without a `type` key are template objects,
   walked recursively (nested literals and `{{...}}` both work).
-- **Generator specs** — objects with a `type` key generate a value via the
+- **Generator specs**: objects with a `type` key generate a value via the
   shared fake generator. Length/range keys use snake_case (`min_length`,
   `max_length`), matching the column format. Supported spec types:
 
@@ -311,8 +311,8 @@ The `response` value is walked recursively:
   | `string`   | `min_length`, `max_length`, `format`         |
   | `int`      | `min`, `max`                                 |
   | `float`    | `min`, `max`                                 |
-  | `bool`     | —                                            |
-  | `datetime` | —                                            |
+  | `bool`     | -                                            |
+  | `datetime` | -                                            |
   | `array`    | `count`, `items` (nested spec or template)   |
   | `object`   | `properties` (map of nested specs/templates) |
 
@@ -320,24 +320,24 @@ The `response` value is walked recursively:
 {...} }`) returns a JSON array.
 
   String specs without an explicit `format` inherit the name heuristics used
-  for tables — e.g. `"email": { "type": "string" }` generates an email, and
+  for tables, e.g. `"email": { "type": "string" }` generates an email, and
   `"user_name"`/`"first_name"`/`"last_name"` generate usernames and names.
   An explicit `format` always wins.
 
-- **Interpolation** — strings containing `{{...}}` are interpolated:
+- **Interpolation**: strings containing `{{...}}` are interpolated:
 
-  | Source            | Description                                                        |
-  | ----------------- | ------------------------------------------------------------------ |
-  | `{{path.name}}`   | URL wildcard value (e.g. `{{path.id}}` for `/users/{id}`)          |
-  | `{{query.name}}`  | Query parameter value                                              |
-  | `{{header.name}}` | Request header — use the lowercase name (e.g. `{{header.x-mock}}`) |
-  | `{{body.name}}`   | Value from the JSON request body (POST/PUT/PATCH echo)             |
-  | `{{now}}`         | Current time (RFC3339)                                             |
+  | Source            | Description                                                       |
+  | ----------------- | ----------------------------------------------------------------- |
+  | `{{path.name}}`   | URL wildcard value (e.g. `{{path.id}}` for `/users/{id}`)         |
+  | `{{query.name}}`  | Query parameter value                                             |
+  | `{{header.name}}` | Request header, use the lowercase name (e.g. `{{header.x-mock}}`) |
+  | `{{body.name}}`   | Value from the JSON request body (POST/PUT/PATCH echo)            |
+  | `{{now}}`         | Current time (RFC3339)                                            |
 
   Missing keys resolve to an empty string; interpolated values are always
   strings.
 
-Note: an object field literally named `type` cannot be expressed — it is
+Note: an object field literally named `type` cannot be expressed, it is
 reserved for generator specs.
 
 ### Route precedence & conflicts
@@ -355,7 +355,7 @@ To avoid conflicts:
 - Use a literal first segment for mock paths (`/users/{id}/stats`), never a
   wildcard mirroring CRUD's `{table}`.
 - Make at least one segment literal or differ in segment count.
-- Keep table names free for CRUD — anchor mock routes under a literal table
+- Keep table names free for CRUD; anchor mock routes under a literal table
   name or dedicated prefix.
 
 ## API endpoints
@@ -370,16 +370,16 @@ schema. Unrecognized tables return `404`.
 GET /{table}?page=1&limit=20&sort=id&order=asc
 ```
 
-- `page` — page number, defaults to `1`
-- `limit` — rows per page, defaults to `20` (max `100`)
-- `sort` — column to sort by, defaults to `id`
-- `order` — `asc` or `desc`, defaults to `asc`
+- `page`: page number, defaults to `1`
+- `limit`: rows per page, defaults to `20` (max `100`)
+- `sort`: column to sort by, defaults to `id`
+- `order`: `asc` or `desc`, defaults to `asc`
 
 Response headers:
 
-- `X-Total-Count` — total number of rows
-- `X-Page` — current page
-- `X-Limit` — page size
+- `X-Total-Count`: total number of rows
+- `X-Page`: current page
+- `X-Limit`: page size
 
 ```bash
 curl "http://localhost:8080/users?page=2&limit=10&sort=age&order=desc"
@@ -404,12 +404,12 @@ POST /{table}
 ```
 
 Body is a JSON object with the columns to set. Unrecognized fields are ignored;
-fields validated against the schema.
+fields are validated against the schema.
 
-- `201 Created` — returns the created row
-- `422 Unprocessable Entity` — validation errors (`{ "errors": [...] }`)
-- `409 Conflict` — unique constraint violation
-- `400 Bad Request` — foreign key violation or invalid JSON
+- `201 Created`: returns the created row
+- `422 Unprocessable Entity`: validation errors (`{ "errors": [...] }`)
+- `409 Conflict`: unique constraint violation
+- `400 Bad Request`: foreign key violation or invalid JSON
 
 ```bash
 curl -X POST http://localhost:8080/users \
@@ -438,9 +438,9 @@ curl -X PUT http://localhost:8080/users/1 \
 DELETE /{table}/{id}
 ```
 
-- `204 No Content` — deleted
-- `404 Not Found` — row doesn't exist
-- `409 Conflict` — row is referenced by other rows (foreign key)
+- `204 No Content`: deleted
+- `404 Not Found`: row doesn't exist
+- `409 Conflict`: row is referenced by other rows (foreign key)
 
 ```bash
 curl -X DELETE http://localhost:8080/users/1

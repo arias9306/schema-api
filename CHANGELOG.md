@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.4] - 2026-08-22
+
+### Added
+
+- Add example JSON schemas for blog, ecommerce, mock, and validation
+
+### Changed
+
+- Enhance data generation with additional formats and types in fakegen
+
 ## [0.0.3] - 2026-08-19
 
 ### Added
@@ -33,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update Makefile to generate coverage reports in a dedicated directory
 - Merge pull request #1 from arias9306/endpoints-support
 - Merge pull request #2 from arias9306/testing
+- Update CHANGELOG for version 0.0.3 with added features, changes, and fixes
 
 ### Fixed
 
@@ -82,6 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Correct receiver name in HasErrors method for consistency
 - Correct property names for min_length and max_length in users table
 
+[0.0.4]: https://github.com/arias9306/schema-api/compare/v0.0.3..v0.0.4
 [0.0.3]: https://github.com/arias9306/schema-api/compare/v0.0.2..v0.0.3
 [0.0.2]: https://github.com/arias9306/schema-api/compare/v0.0.1..v0.0.2
 [0.0.1]: https://github.com/arias9306/schema-api/releases/tag/v0.0.1

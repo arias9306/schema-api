@@ -135,8 +135,8 @@ type renderer struct {
 	now  time.Time
 }
 
-func Render(template any, randomizer *rand.Rand, ctx map[string]string) (any, error) {
-	render := &renderer{rand: randomizer, ctx: ctx, now: time.Now()}
+func Render(template any, rng *rand.Rand, ctx map[string]string) (any, error) {
+	render := &renderer{rand: rng, ctx: ctx, now: time.Now()}
 	return render.render(template, "")
 }
 

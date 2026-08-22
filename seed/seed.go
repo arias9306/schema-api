@@ -23,7 +23,7 @@ func Seed(database *sql.DB, schema *schema.Schema, rowPerTable int) error {
 
 	parentIDs := map[string][]int64{}
 
-	randomizer := rand.New(rand.NewSource(time.Now().UnixNano()))
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	for _, table := range topologicalList {
 
@@ -45,11 +45,11 @@ func Seed(database *sql.DB, schema *schema.Schema, rowPerTable int) error {
 						continue
 					}
 
-					row[column.Name] = foreingKeys[randomizer.Intn(len(foreingKeys))]
+					row[column.Name] = foreingKeys[rng.Intn(len(foreingKeys))]
 					continue
 				}
 
-				value, err := generateValue(randomizer, column, uniqueSets[column.Name])
+				value, err := generateValue(rng, column, uniqueSets[column.Name])
 				if err != nil {
 					return fmt.Errorf("seeding %s row %d column %s: %w", table.Name, i, column.Name, err)
 				}
@@ -137,9 +137,9 @@ func topologicalSort(tables []schema.Table) ([]schema.Table, error) {
 	return result, nil
 }
 
-func generateValue(randomizer *rand.Rand, column schema.Column, used map[string]bool) (any, error) {
+func generateValue(rng *rand.Rand, column schema.Column, used map[string]bool) (any, error) {
 	for attempt := 0; ; attempt++ {
-		value, err := fakegen.Value(randomizer, columnToSpec(column))
+		value, err := fakegen.Value(rng, columnToSpec(column))
 		if err != nil {
 			return nil, err
 		}

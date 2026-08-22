@@ -11,7 +11,8 @@ templated JSON responses — either on their own or alongside tables.
 - **Schema-driven tables** — describe tables and columns in a single JSON file
 - **In-memory SQLite** — tables are created automatically on startup
 - **Realistic sample data** — built-in generators for names, emails, phones,
-  addresses, cities, countries, URLs, UUIDs, and more
+  addresses, credit cards, IBANs, IP addresses, coordinates, lorem text,
+  UUIDs, and more
 - **Foreign keys** — seeds rows in dependency order and honors FK references
 - **Full CRUD API** — list, get, create, update, and delete rows
 - **Input validation** — type checks, numeric ranges, string lengths, regex
@@ -188,19 +189,44 @@ automatically gets an `id INTEGER PRIMARY KEY AUTOINCREMENT` column.
 When seeding, the generator is chosen from the `format` property, or inferred
 from the column name (e.g. a column named `email` generates emails).
 
-| Format      | Description    |
-| ----------- | -------------- |
-| `name`      | Full name      |
-| `firstname` | First name     |
-| `lastname`  | Last name      |
-| `username`  | Username       |
-| `email`     | Email address  |
-| `phone`     | Phone number   |
-| `address`   | Street address |
-| `city`      | City           |
-| `country`   | Country        |
-| `url`       | URL            |
-| `uuid`      | UUID v4        |
+| Format            | Description                          | Also inferred from                                 |
+| ----------------- | ------------------------------------ | -------------------------------------------------- |
+| `name`            | Full name                            | `full_name`                                        |
+| `firstname`       | First name                           | `first_name`                                       |
+| `lastname`        | Last name                            | `last_name`                                        |
+| `username`        | Username                             | `user_name`                                        |
+| `email`           | Email address                        | `user_email`                                       |
+| `phone`           | Phone number                         | —                                                  |
+| `address`         | Street address                       | —                                                  |
+| `city`            | City                                 | —                                                  |
+| `country`         | Country                              | —                                                  |
+| `url`             | URL                                  | —                                                  |
+| `uuid`            | UUID v4                              | —                                                  |
+| `credit_card`     | 16-digit card number (Luhn-valid)    | `card_number`                                      |
+| `hex_color`       | Hex color code (e.g. `#A1B2C3`)      | `color`                                            |
+| `ipv4`            | IPv4 address                         | `ip_address`                                       |
+| `ipv6`            | IPv6 address                         | —                                                  |
+| `mac_address`     | MAC address                          | —                                                  |
+| `mime_type`       | MIME type (e.g. `application/json`)  | —                                                  |
+| `file_extension`  | File extension including dot         | `file_ext`, `extension`                            |
+| `currency_amount` | Dollar amount (e.g. `$123.45`)       | `price`, `amount`, `total`                         |
+| `product_name`    | Fake product name                    | —                                                  |
+| `slug`            | Hyphenated URL slug                  | `url_slug`                                         |
+| `word`            | Single lorem word                    | —                                                  |
+| `isbn`            | ISBN-13 with valid check digit       | —                                                  |
+| `lat`             | Latitude between `-90` and `90`      | `latitude`                                         |
+| `lng`             | Longitude between `-180` and `180`   | `longitude`                                        |
+| `timezone`        | IANA timezone (e.g. `Europe/Madrid`) | `tz`                                               |
+| `job_title`       | Job title                            | —                                                  |
+| `company`         | Company name                         | `company_name`                                     |
+| `iban`            | IBAN with mod-97 check digits        | `account_number`                                   |
+| `date`            | Date in `YYYY-MM-DD` format          | `birth_date`, `dob`                                |
+| `lorem`           | Lorem ipsum phrase                   | `description`, `bio`, `summary`, `body`, `content` |
+| `sentence`        | Capitalized sentence ending in `.`   | —                                                  |
+
+Matching is substring-based, so a column named `card_number` resolves to the
+`credit_card` generator. Use type `datetime` for RFC3339 timestamps; `date`
+produces a plain `YYYY-MM-DD` string.
 
 ## Mock endpoints
 

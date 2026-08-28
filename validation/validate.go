@@ -3,6 +3,7 @@ package validation
 
 import (
 	"fmt"
+	"maps"
 	"math"
 	"regexp"
 	"strings"
@@ -28,10 +29,8 @@ func (v *ValidationError) HasErrors() bool {
 }
 
 func ValidateCreate(table schema.Table, data map[string]any) (*ValidationError, map[string]any) {
-	cleaned := make(map[string]any)
-	for key, value := range data {
-		cleaned[key] = value
-	}
+	cleaned := make(map[string]any, len(data))
+	maps.Copy(cleaned, data)
 
 	errors := &ValidationError{}
 

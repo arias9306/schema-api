@@ -201,7 +201,7 @@ func TestGenerateValue(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
 	used := map[string]bool{}
 
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		v, err := generateValue(rng, schema.Column{Name: "email", Type: "string", Unique: true}, used)
 		require.NoError(t, err)
 		s, ok := v.(string)

@@ -2,10 +2,13 @@
 package schema
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/arias9306/schema-api/fakegen"
@@ -95,11 +98,7 @@ var templateRefRegex = regexp.MustCompile(`\{\{\s*([^{}]+?)\s*\}\}`)
 func extractTableColumnRefs(template any) []string {
 	refs := map[string]bool{}
 	walkTemplateRefs(template, refs)
-	out := make([]string, 0, len(refs))
-	for r := range refs {
-		out = append(out, r)
-	}
-	return out
+	return slices.Collect(maps.Keys(refs))
 }
 
 func walkTemplateRefs(v any, refs map[string]bool) {
@@ -246,10 +245,7 @@ func (s *Schema) validateColumns(table *Table, tableLabel string, errors *[]stri
 
 func (s *Schema) validateForeignKey(column *Column, label string, errors *[]string) {
 	parent := column.ForeignKey.Table
-	parentColumn := column.ForeignKey.Column
-	if parentColumn == "" {
-		parentColumn = "id"
-	}
+	parentColumn := cmp.Or(column.ForeignKey.Column, "id")
 
 	var parentTable *Table
 	for i := range s.Tables {
@@ -295,9 +291,7 @@ func (s *Schema) validateEndpoints(errors *[]string) {
 			*errors = append(*errors, fmt.Sprintf("%s (%s %s): response is required", label, endpoint.Method, endpoint.Path))
 		}
 
-		if endpoint.Status == 0 {
-			endpoint.Status = 200
-		}
+		endpoint.Status = cmp.Or(endpoint.Status, 200)
 
 		key := endpoint.Method + " " + endpoint.Path
 		if first, ok := seen[key]; ok {
@@ -363,9 +357,7 @@ func (s *Schema) validateTableEndpoints(errors *[]string) {
 			*errors = append(*errors, fmt.Sprintf("%s (%s %s): response is required", label, ep.Method, ep.Path))
 		}
 
-		if ep.Status == 0 {
-			ep.Status = 200
-		}
+		ep.Status = cmp.Or(ep.Status, 200)
 
 		tablesSet := map[string]bool{}
 		for _, t := range ep.Tables {
@@ -387,17 +379,17 @@ func (s *Schema) validateTableEndpoints(errors *[]string) {
 
 		for _, join := range ep.Joins {
 			checkJoinRef := func(ref string, which string) {
-				parts := strings.SplitN(ref, ".", 2)
-				if len(parts) != 2 || !validIdentifier(parts[0]) || !validIdentifier(parts[1]) {
+				left, right, ok := strings.Cut(ref, ".")
+				if !ok || !validIdentifier(left) || !validIdentifier(right) {
 					*errors = append(*errors, fmt.Sprintf("%s (%s %s): join %s %q must be in table.column format", label, ep.Method, ep.Path, which, ref))
 					return
 				}
-				if !tablesSet[parts[0]] {
-					*errors = append(*errors, fmt.Sprintf("%s (%s %s): join %s references table %q not listed in tables", label, ep.Method, ep.Path, which, parts[0]))
+				if !tablesSet[left] {
+					*errors = append(*errors, fmt.Sprintf("%s (%s %s): join %s references table %q not listed in tables", label, ep.Method, ep.Path, which, left))
 					return
 				}
-				if !tableColumns[parts[0]][parts[1]] {
-					*errors = append(*errors, fmt.Sprintf("%s (%s %s): join %s references unknown column %q in table %q", label, ep.Method, ep.Path, which, parts[1], parts[0]))
+				if !tableColumns[left][right] {
+					*errors = append(*errors, fmt.Sprintf("%s (%s %s): join %s references unknown column %q in table %q", label, ep.Method, ep.Path, which, right, left))
 				}
 			}
 			checkJoinRef(join.On.Local, "local")
@@ -415,12 +407,15 @@ func (s *Schema) validateTableEndpoints(errors *[]string) {
 
 		if ep.Response != nil {
 			for _, ref := range extractTableColumnRefs(ep.Response) {
-				parts := strings.SplitN(ref, ".", 2)
-				if !tablesSet[parts[0]] {
+				left, right, ok := strings.Cut(ref, ".")
+				if !ok {
 					continue
 				}
-				if !tableColumns[parts[0]][parts[1]] {
-					*errors = append(*errors, fmt.Sprintf("%s (%s %s): response references unknown column %q in table %q", label, ep.Method, ep.Path, parts[1], parts[0]))
+				if !tablesSet[left] {
+					continue
+				}
+				if !tableColumns[left][right] {
+					*errors = append(*errors, fmt.Sprintf("%s (%s %s): response references unknown column %q in table %q", label, ep.Method, ep.Path, right, left))
 				}
 			}
 		}
@@ -446,12 +441,9 @@ func validFormat(format string) bool {
 }
 
 func columnInTable(table *Table, name string) bool {
-	for _, column := range table.Columns {
-		if column.Name == name {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(table.Columns, func(c Column) bool {
+		return c.Name == name
+	})
 }
 
 func ParseSchema(path string) (*Schema, error) {

@@ -20,7 +20,7 @@ func TestValueInt(t *testing.T) {
 	min, max := 5.0, 10.0
 	spec := Spec{Type: "int", Min: &min, Max: &max}
 
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		v, err := Value(rng, spec)
 		require.NoError(t, err)
 		n, ok := v.(int)
@@ -62,7 +62,7 @@ func TestValueFloat(t *testing.T) {
 	min, max := 0.0, 100.0
 	spec := Spec{Type: "float", Min: &min, Max: &max}
 
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		v, err := Value(rng, spec)
 		require.NoError(t, err)
 		f := v.(float64)
@@ -83,7 +83,7 @@ func TestValueBool(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
 	sawTrue, sawFalse := false, false
 
-	for i := 0; i < 200; i++ {
+	for range 200 {
 		v, err := Value(rng, Spec{Type: "bool"})
 		require.NoError(t, err)
 		b, ok := v.(bool)
@@ -133,7 +133,7 @@ func TestValueStringLengthBounds(t *testing.T) {
 	minLen, maxLen := 8, 12
 	spec := Spec{Type: "string", MinLength: &minLen, MaxLength: &maxLen}
 
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		v, err := Value(rng, spec)
 		require.NoError(t, err)
 		assert.GreaterOrEqual(t, len(v.(string)), 8)
@@ -259,14 +259,14 @@ func TestRandomString(t *testing.T) {
 func TestGenEmail(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
 	pattern := regexp.MustCompile(`^[a-zñáéíóúü]+\.[a-zñáéíóúü]+\d+@[a-z.]+$`)
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		assert.Regexp(t, pattern, GenEmail(rng))
 	}
 }
 
 func TestGenPhone(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		assert.Regexp(t, regexp.MustCompile(`^\+57 3\d+$`), GenPhone(rng))
 	}
 }
@@ -274,28 +274,28 @@ func TestGenPhone(t *testing.T) {
 func TestGenUsername(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
 	pattern := regexp.MustCompile(`^[a-zñáéíóúü]+\d{1,2}$`)
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		assert.Regexp(t, pattern, GenUsername(rng))
 	}
 }
 
 func TestGenURL(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		assert.Regexp(t, regexp.MustCompile(`^https://[a-z]+\.acme/$`), GenURL(rng))
 	}
 }
 
 func TestGenAddress(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		assert.Regexp(t, regexp.MustCompile(`^(Calle|Carrera) \d+ # \d+ - \d+$`), GenAddress(rng))
 	}
 }
 
 func TestGenFullName(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		name := GenFullName(rng)
 		assert.Contains(t, name, " ")
 		parts := regexp.MustCompile(`\s+`).Split(name, -1)
@@ -306,7 +306,7 @@ func TestGenFullName(t *testing.T) {
 func TestGenUUID(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
 	seen := map[string]bool{}
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		u := GenUUID(rng)
 		assert.Regexp(t, uuidV4Pattern, u)
 		assert.False(t, seen[u], "uuid should be unique")
@@ -316,13 +316,13 @@ func TestGenUUID(t *testing.T) {
 
 func TestGenCreditCard(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		cc := GenCreditCard(rng)
 		assert.Regexp(t, regexp.MustCompile(`^\d{4} \d{4} \d{4} \d{4}$`), cc)
 
 		digits := strings.ReplaceAll(cc, " ", "")
 		sum := 0
-		for j := 0; j < 16; j++ {
+		for j := range 16 {
 			d, _ := strconv.Atoi(string(digits[j]))
 			v := d
 			if j%2 == 0 {
@@ -339,14 +339,14 @@ func TestGenCreditCard(t *testing.T) {
 
 func TestGenHexColor(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		assert.Regexp(t, regexp.MustCompile(`^#[0-9A-F]{6}$`), GenHexColor(rng))
 	}
 }
 
 func TestGenIPv4(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		ip := GenIPv4(rng)
 		parts := strings.Split(ip, ".")
 		assert.Len(t, parts, 4)
@@ -361,7 +361,7 @@ func TestGenIPv4(t *testing.T) {
 
 func TestGenIPv6(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		ip := GenIPv6(rng)
 		parts := strings.Split(ip, ":")
 		assert.Len(t, parts, 8)
@@ -373,7 +373,7 @@ func TestGenIPv6(t *testing.T) {
 
 func TestGenMACAddress(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		assert.Regexp(t, regexp.MustCompile(`^[0-9A-F]{2}(:[0-9A-F]{2}){5}$`), GenMACAddress(rng))
 	}
 }
@@ -381,7 +381,7 @@ func TestGenMACAddress(t *testing.T) {
 func TestGenMimeType(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
 	seen := map[string]bool{}
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		m := GenMimeType(rng)
 		assert.Contains(t, m, "/")
 		seen[m] = true
@@ -392,7 +392,7 @@ func TestGenMimeType(t *testing.T) {
 func TestGenFileExtension(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
 	seen := map[string]bool{}
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		ext := GenFileExtension(rng)
 		assert.True(t, strings.HasPrefix(ext, "."))
 		assert.Greater(t, len(ext), 1)
@@ -403,7 +403,7 @@ func TestGenFileExtension(t *testing.T) {
 
 func TestGenCurrencyAmount(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		amt := GenCurrencyAmount(rng)
 		assert.True(t, strings.HasPrefix(amt, "$"))
 		parts := strings.Split(strings.TrimPrefix(amt, "$"), ".")
@@ -414,16 +414,17 @@ func TestGenCurrencyAmount(t *testing.T) {
 
 func TestGenProductName(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		p := GenProductName(rng)
-		parts := strings.SplitN(p, " ", 2)
-		assert.Len(t, parts, 2, "product name should have 2 parts: %s", p)
+		_, right, ok := strings.Cut(p, " ")
+		require.True(t, ok, "product name should have 2 parts: %s", p)
+		assert.NotEmpty(t, right)
 	}
 }
 
 func TestGenSlug(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		slug := GenSlug(rng)
 		assert.NotEmpty(t, slug)
 		assert.False(t, strings.HasPrefix(slug, "-"))
@@ -438,7 +439,7 @@ func TestGenSlug(t *testing.T) {
 func TestGenWord(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
 	seen := map[string]bool{}
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		w := GenWord(rng)
 		assert.NotEmpty(t, w)
 		assert.Equal(t, w, strings.ToLower(w))
@@ -449,7 +450,7 @@ func TestGenWord(t *testing.T) {
 
 func TestGenISBN(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		isbn := GenISBN(rng)
 		assert.Regexp(t, regexp.MustCompile(`^\d{3}-\d-\d{2}-\d{6}-\d$`), isbn)
 
@@ -469,7 +470,7 @@ func TestGenISBN(t *testing.T) {
 
 func TestGenLat(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		lat := GenLat(rng)
 		n, err := strconv.ParseFloat(lat, 64)
 		require.NoError(t, err)
@@ -480,7 +481,7 @@ func TestGenLat(t *testing.T) {
 
 func TestGenLng(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		lng := GenLng(rng)
 		n, err := strconv.ParseFloat(lng, 64)
 		require.NoError(t, err)
@@ -492,7 +493,7 @@ func TestGenLng(t *testing.T) {
 func TestGenTimezone(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
 	seen := map[string]bool{}
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		tz := GenTimezone(rng)
 		assert.Contains(t, tz, "/")
 		seen[tz] = true
@@ -503,7 +504,7 @@ func TestGenTimezone(t *testing.T) {
 func TestGenJobTitle(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
 	seen := map[string]bool{}
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		title := GenJobTitle(rng)
 		assert.NotEmpty(t, title)
 		seen[title] = true
@@ -513,16 +514,17 @@ func TestGenJobTitle(t *testing.T) {
 
 func TestGenCompany(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		c := GenCompany(rng)
-		parts := strings.SplitN(c, " ", 2)
-		assert.Len(t, parts, 2, "company name should have 2 parts: %s", c)
+		_, right, ok := strings.Cut(c, " ")
+		require.True(t, ok, "company name should have 2 parts: %s", c)
+		assert.NotEmpty(t, right)
 	}
 }
 
 func TestGenIBAN(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		iban := GenIBAN(rng)
 		assert.GreaterOrEqual(t, len(iban), 15)
 		assert.Regexp(t, regexp.MustCompile(`^[A-Z]{2}\d{2}[A-Z0-9]+$`), iban)
@@ -531,7 +533,7 @@ func TestGenIBAN(t *testing.T) {
 
 func TestGenDate(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		d := GenDate(rng)
 		parsed, err := time.Parse("2006-01-02", d)
 		require.NoError(t, err)
@@ -542,7 +544,7 @@ func TestGenDate(t *testing.T) {
 
 func TestGenLorem(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		text := GenLorem(rng)
 		words := strings.Split(text, " ")
 		assert.GreaterOrEqual(t, len(words), 6)
@@ -555,7 +557,7 @@ func TestGenLorem(t *testing.T) {
 
 func TestGenSentence(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		s := GenSentence(rng)
 		assert.True(t, strings.HasSuffix(s, "."))
 		first := string(s[0])

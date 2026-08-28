@@ -3,6 +3,7 @@
 package mock
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -90,10 +91,7 @@ func (h *Handler) handlerFor(i int) http.HandlerFunc {
 			}
 		}
 
-		status := e.Status
-		if status == 0 {
-			status = http.StatusOK
-		}
+		status := cmp.Or(e.Status, http.StatusOK)
 
 		for name, value := range e.Headers {
 			w.Header().Set(name, value)

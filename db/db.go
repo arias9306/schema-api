@@ -2,9 +2,11 @@
 package db
 
 import (
+	"cmp"
 	"database/sql"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/arias9306/schema-api/schema"
@@ -41,10 +43,7 @@ func CreateTable(db *sql.DB, table schema.Table) error {
 		}
 
 		if column.ForeignKey != nil {
-			refColumn := column.ForeignKey.Column
-			if refColumn == "" {
-				refColumn = "id"
-			}
+			refColumn := cmp.Or(column.ForeignKey.Column, "id")
 			columnDef += " REFERENCES " + quoteIdent(column.ForeignKey.Table) + " (" + quoteIdent(refColumn) + ")"
 		}
 
@@ -225,10 +224,10 @@ func sanitizeSort(table schema.Table, sort string) string {
 		return "id"
 	}
 
-	for _, column := range table.Columns {
-		if column.Name == sort {
-			return sort
-		}
+	if slices.ContainsFunc(table.Columns, func(c schema.Column) bool {
+		return c.Name == sort
+	}) {
+		return sort
 	}
 
 	return "id"

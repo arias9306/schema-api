@@ -239,8 +239,8 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func constraintCode(err error) *int {
-	var sqliteErr *sqlite.Error
-	if !errors.As(err, &sqliteErr) {
+	sqliteErr, ok := errors.AsType[*sqlite.Error](err)
+	if !ok {
 		return nil
 	}
 

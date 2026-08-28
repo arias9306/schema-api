@@ -24,12 +24,12 @@ func BuildSelectColumns(response any, tables []string, tableMap map[string]schem
 	for _, table := range tables {
 		columns = append(columns, columnAlias(table, "id"))
 		for ref := range refs {
-			parts := strings.SplitN(ref, ".", 2)
-			if len(parts) != 2 {
+			left, right, ok := strings.Cut(ref, ".")
+			if !ok {
 				continue
 			}
-			if parts[0] == table && parts[1] != "id" {
-				columns = append(columns, columnAlias(table, parts[1]))
+			if left == table && right != "id" {
+				columns = append(columns, columnAlias(table, right))
 			}
 		}
 	}
@@ -70,7 +70,7 @@ func walkRefs(v any, refs map[string]bool) {
 func InferJoins(tables []string, tableMap map[string]schema.Table) ([]schema.Join, error) {
 	joins := make([]schema.Join, 0, len(tables)-1)
 
-	for i := 0; i < len(tables)-1; i++ {
+	for i := range len(tables) - 1 {
 		left := tables[i]
 		right := tables[i+1]
 
@@ -102,10 +102,6 @@ func findJoin(parent, child string, childTable schema.Table) (schema.Join, bool)
 	for _, column := range childTable.Columns {
 		if column.ForeignKey == nil || column.ForeignKey.Table != parent {
 			continue
-		}
-		refColumn := column.ForeignKey.Column
-		if refColumn == "" {
-			refColumn = "id"
 		}
 		return schema.Join{
 			Type: "INNER",
@@ -154,11 +150,11 @@ type tableColumn struct {
 }
 
 func splitRef(ref string) tableColumn {
-	parts := strings.SplitN(ref, ".", 2)
-	if len(parts) != 2 {
+	table, column, ok := strings.Cut(ref, ".")
+	if !ok {
 		return tableColumn{}
 	}
-	return tableColumn{table: parts[0], column: parts[1]}
+	return tableColumn{table: table, column: column}
 }
 
 func InterpolateWhere(conditions []string, ctx map[string]string) (string, []any, error) {

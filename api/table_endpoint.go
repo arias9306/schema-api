@@ -1,6 +1,7 @@
 package api
 
 import (
+	"cmp"
 	"database/sql"
 	"fmt"
 	"net/http"
@@ -87,10 +88,7 @@ func (h *TableEndpointHandler) handlerFor(i int) http.HandlerFunc {
 
 		rendered := db.BuildTableEndpointResponse(ep.Response, results)
 
-		status := ep.Status
-		if status == 0 {
-			status = http.StatusOK
-		}
+		status := cmp.Or(ep.Status, http.StatusOK)
 
 		for name, value := range ep.Headers {
 			w.Header().Set(name, value)

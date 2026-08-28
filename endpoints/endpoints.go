@@ -2,6 +2,7 @@
 package endpoints
 
 import (
+	"cmp"
 	"fmt"
 	"strconv"
 	"strings"
@@ -44,10 +45,7 @@ func Collect(s *schema.Schema) []Info {
 	}
 
 	for _, endpoint := range s.Endpoints {
-		status := endpoint.Status
-		if status == 0 {
-			status = 200
-		}
+		status := cmp.Or(endpoint.Status, 200)
 		routes = append(routes, Info{
 			Method: endpoint.Method,
 			Path:   endpoint.Path,
@@ -57,10 +55,7 @@ func Collect(s *schema.Schema) []Info {
 	}
 
 	for _, endpoint := range s.TableEndpoints {
-		status := endpoint.Status
-		if status == 0 {
-			status = 200
-		}
+		status := cmp.Or(endpoint.Status, 200)
 		routes = append(routes, Info{
 			Method: endpoint.Method,
 			Path:   endpoint.Path,
@@ -107,7 +102,7 @@ func formatTable(routes []Info) string {
 		if i > 0 {
 			b.WriteString("  ")
 		}
-		for j := 0; j < w; j++ {
+		for range w {
 			b.WriteString("-")
 		}
 	}

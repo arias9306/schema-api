@@ -45,9 +45,30 @@ type Endpoint struct {
 	Response any               `json:"response"`
 }
 
+type JoinCondition struct {
+	Local   string `json:"local"`
+	Foreign string `json:"foreign"`
+}
+
+type Join struct {
+	Type string        `json:"type"`
+	On   JoinCondition `json:"on"`
+}
+
+type TableEndpoint struct {
+	Path     string            `json:"path"`
+	Headers  map[string]string `json:"headers,omitempty"`
+	Tables   []string          `json:"tables"`
+	Joins    []Join            `json:"joins,omitempty"`
+	Where    []string          `json:"where,omitempty"`
+	OrderBy  string            `json:"order_by,omitempty"`
+	Response any               `json:"response"`
+}
+
 type Schema struct {
-	Tables    []Table    `json:"tables,omitempty"`
-	Endpoints []Endpoint `json:"endpoints,omitempty"`
+	Tables         []Table         `json:"tables,omitempty"`
+	Endpoints      []Endpoint      `json:"endpoints,omitempty"`
+	TableEndpoints []TableEndpoint `json:"table_endpoints,omitempty"`
 }
 
 var allowedMethods = map[string]bool{

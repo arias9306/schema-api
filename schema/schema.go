@@ -56,12 +56,15 @@ type Join struct {
 }
 
 type TableEndpoint struct {
+	Method   string            `json:"method"`
 	Path     string            `json:"path"`
+	Status   int               `json:"status"`
 	Headers  map[string]string `json:"headers,omitempty"`
 	Tables   []string          `json:"tables"`
 	Joins    []Join            `json:"joins,omitempty"`
 	Where    []string          `json:"where,omitempty"`
 	OrderBy  string            `json:"order_by,omitempty"`
+	Limit    *int              `json:"limit,omitempty"`
 	Response any               `json:"response"`
 }
 
@@ -83,6 +86,42 @@ var wildcardPattern = regexp.MustCompile(`\{([^{}]+)\}`)
 
 var identifierPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*$`)
 
+var tableColumnRegex = regexp.MustCompile(`([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)`)
+
+var wherePlaceholderRegex = regexp.MustCompile(`\{\{[^}]*\}\}`)
+
+var templateRefRegex = regexp.MustCompile(`\{\{\s*([^{}]+?)\s*\}\}`)
+
+func extractTableColumnRefs(template any) []string {
+	refs := map[string]bool{}
+	walkTemplateRefs(template, refs)
+	out := make([]string, 0, len(refs))
+	for r := range refs {
+		out = append(out, r)
+	}
+	return out
+}
+
+func walkTemplateRefs(v any, refs map[string]bool) {
+	switch val := v.(type) {
+	case string:
+		for _, m := range templateRefRegex.FindAllStringSubmatch(val, -1) {
+			expr := strings.TrimSpace(m[1])
+			if strings.Contains(expr, ".") {
+				refs[expr] = true
+			}
+		}
+	case []any:
+		for _, item := range val {
+			walkTemplateRefs(item, refs)
+		}
+	case map[string]any:
+		for _, item := range val {
+			walkTemplateRefs(item, refs)
+		}
+	}
+}
+
 var validColumnTypes = map[string]bool{
 	"string":   true,
 	"int":      true,
@@ -100,6 +139,15 @@ func (e Endpoint) ParamNames() []string {
 	return names
 }
 
+func (e TableEndpoint) ParamNames() []string {
+	matches := wildcardPattern.FindAllStringSubmatch(e.Path, -1)
+	names := make([]string, 0, len(matches))
+	for _, m := range matches {
+		names = append(names, m[1])
+	}
+	return names
+}
+
 func (s *Schema) Validate() error {
 	if len(s.Tables) == 0 && len(s.Endpoints) == 0 {
 		return fmt.Errorf("schema must define at least one of table or endpoint")
@@ -108,6 +156,7 @@ func (s *Schema) Validate() error {
 	var errors []string
 	s.validateTables(&errors)
 	s.validateEndpoints(&errors)
+	s.validateTableEndpoints(&errors)
 
 	if len(errors) > 0 {
 		return fmt.Errorf("invalid schema: %s", strings.Join(errors, "; "))
@@ -253,6 +302,134 @@ func (s *Schema) validateEndpoints(errors *[]string) {
 		key := endpoint.Method + " " + endpoint.Path
 		if first, ok := seen[key]; ok {
 			*errors = append(*errors, fmt.Sprintf("%s (%s): duplicate pattern, already defined at endpoints[%d]", label, key, first))
+		} else {
+			seen[key] = i
+		}
+	}
+}
+
+func (s *Schema) validateTableEndpoints(errors *[]string) {
+	seen := map[string]int{}
+	tableMap := map[string]Table{}
+	tableColumns := map[string]map[string]bool{}
+	for i := range s.Tables {
+		t := &s.Tables[i]
+		tableMap[t.Name] = *t
+		cols := map[string]bool{}
+		for _, c := range t.Columns {
+			cols[c.Name] = true
+		}
+		tableColumns[t.Name] = cols
+	}
+
+	crudPatterns := map[string]bool{}
+	for _, t := range s.Tables {
+		for _, route := range []string{
+			"GET /" + t.Name,
+			"GET /" + t.Name + "/{id}",
+			"POST /" + t.Name,
+			"PUT /" + t.Name + "/{id}",
+			"DELETE /" + t.Name + "/{id}",
+		} {
+			crudPatterns[route] = true
+		}
+	}
+
+	for i := range s.Endpoints {
+		key := strings.ToUpper(strings.TrimSpace(s.Endpoints[i].Method)) + " " + s.Endpoints[i].Path
+		seen[key] = i
+	}
+
+	for i := range s.TableEndpoints {
+		ep := &s.TableEndpoints[i]
+		label := fmt.Sprintf("table_endpoints[%d]", i)
+
+		if strings.TrimSpace(ep.Method) == "" {
+			*errors = append(*errors, fmt.Sprintf("%s: method is required", label))
+		} else {
+			ep.Method = strings.ToUpper(strings.TrimSpace(ep.Method))
+			if ep.Method != "GET" {
+				*errors = append(*errors, fmt.Sprintf("%s: invalid method %q: table endpoints only support GET", label, ep.Method))
+			}
+		}
+
+		if strings.TrimSpace(ep.Path) == "" {
+			*errors = append(*errors, fmt.Sprintf("%s: path is required", label))
+		} else if !strings.HasPrefix(ep.Path, "/") {
+			*errors = append(*errors, fmt.Sprintf("%s (%s %s): path %q must start with /", label, ep.Method, ep.Path, ep.Path))
+		}
+
+		if ep.Response == nil {
+			*errors = append(*errors, fmt.Sprintf("%s (%s %s): response is required", label, ep.Method, ep.Path))
+		}
+
+		if ep.Status == 0 {
+			ep.Status = 200
+		}
+
+		tablesSet := map[string]bool{}
+		for _, t := range ep.Tables {
+			if t == "" {
+				*errors = append(*errors, fmt.Sprintf("%s (%s %s): table name is required", label, ep.Method, ep.Path))
+				continue
+			}
+			if _, ok := tableMap[t]; !ok {
+				*errors = append(*errors, fmt.Sprintf("%s (%s %s): references unknown table %q", label, ep.Method, ep.Path, t))
+			}
+			if tablesSet[t] {
+				*errors = append(*errors, fmt.Sprintf("%s (%s %s): duplicate table %q", label, ep.Method, ep.Path, t))
+			}
+			tablesSet[t] = true
+		}
+		if len(ep.Tables) == 0 {
+			*errors = append(*errors, fmt.Sprintf("%s (%s %s): at least one table is required", label, ep.Method, ep.Path))
+		}
+
+		for _, join := range ep.Joins {
+			checkJoinRef := func(ref string, which string) {
+				parts := strings.SplitN(ref, ".", 2)
+				if len(parts) != 2 || !validIdentifier(parts[0]) || !validIdentifier(parts[1]) {
+					*errors = append(*errors, fmt.Sprintf("%s (%s %s): join %s %q must be in table.column format", label, ep.Method, ep.Path, which, ref))
+					return
+				}
+				if !tablesSet[parts[0]] {
+					*errors = append(*errors, fmt.Sprintf("%s (%s %s): join %s references table %q not listed in tables", label, ep.Method, ep.Path, which, parts[0]))
+					return
+				}
+				if !tableColumns[parts[0]][parts[1]] {
+					*errors = append(*errors, fmt.Sprintf("%s (%s %s): join %s references unknown column %q in table %q", label, ep.Method, ep.Path, which, parts[1], parts[0]))
+				}
+			}
+			checkJoinRef(join.On.Local, "local")
+			checkJoinRef(join.On.Foreign, "foreign")
+		}
+
+		for _, cond := range ep.Where {
+			stripped := wherePlaceholderRegex.ReplaceAllString(cond, "")
+			for _, m := range tableColumnRegex.FindAllStringSubmatch(stripped, -1) {
+				if !tablesSet[m[1]] {
+					*errors = append(*errors, fmt.Sprintf("%s (%s %s): where condition references unknown table %q", label, ep.Method, ep.Path, m[1]))
+				}
+			}
+		}
+
+		if ep.Response != nil {
+			for _, ref := range extractTableColumnRefs(ep.Response) {
+				parts := strings.SplitN(ref, ".", 2)
+				if !tablesSet[parts[0]] {
+					continue
+				}
+				if !tableColumns[parts[0]][parts[1]] {
+					*errors = append(*errors, fmt.Sprintf("%s (%s %s): response references unknown column %q in table %q", label, ep.Method, ep.Path, parts[1], parts[0]))
+				}
+			}
+		}
+
+		key := strings.ToUpper(strings.TrimSpace(ep.Method)) + " " + ep.Path
+		if first, ok := seen[key]; ok {
+			*errors = append(*errors, fmt.Sprintf("%s (%s): duplicate pattern, already defined at index %d", label, key, first))
+		} else if crudPatterns[key] {
+			*errors = append(*errors, fmt.Sprintf("%s (%s): duplicate pattern, shadows a CRUD route", label, key))
 		} else {
 			seen[key] = i
 		}

@@ -56,6 +56,19 @@ func Collect(s *schema.Schema) []Info {
 		})
 	}
 
+	for _, endpoint := range s.TableEndpoints {
+		status := endpoint.Status
+		if status == 0 {
+			status = 200
+		}
+		routes = append(routes, Info{
+			Method: endpoint.Method,
+			Path:   endpoint.Path,
+			Source: "table_endpoint",
+			Status: strconv.Itoa(status),
+		})
+	}
+
 	return routes
 }
 

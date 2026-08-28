@@ -70,6 +70,14 @@ func main() {
 		}
 
 		api.NewAPIHandler(database, schema).Register(mux)
+
+		if len(schema.TableEndpoints) > 0 {
+			teHandler := api.NewTableEndpointHandler(database, schema)
+			if err := teHandler.Register(mux); err != nil {
+				log.Fatalf("failed to register table endpoints: %v", err)
+			}
+			fmt.Println("table endpoints registered.")
+		}
 	}
 
 	if len(schema.Endpoints) > 0 {

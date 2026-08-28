@@ -474,6 +474,20 @@ func TestValidateTableEndpointsStatusDefault(t *testing.T) {
 	assert.Equal(t, 200, sch.TableEndpoints[0].Status)
 }
 
+func TestValidateTableEndpointsJoinOnReservedId(t *testing.T) {
+	ep := TableEndpoint{
+		Method: "GET",
+		Path:   "/users/{id}/posts",
+		Tables: []string{"users", "posts"},
+		Joins: []Join{
+			{Type: "INNER", On: JoinCondition{Local: "users.id", Foreign: "posts.user_id"}},
+		},
+		Response: map[string]any{"x": "{{users.id}}", "y": "{{posts.title}}"},
+	}
+	err := tableEndpointSchema(ep).Validate()
+	require.NoError(t, err)
+}
+
 func validSchema() *Schema {
 	return &Schema{
 		Tables: []Table{

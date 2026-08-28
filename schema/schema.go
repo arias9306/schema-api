@@ -309,7 +309,7 @@ func (s *Schema) validateTableEndpoints(errors *[]string) {
 	for i := range s.Tables {
 		t := &s.Tables[i]
 		tableMap[t.Name] = *t
-		cols := map[string]bool{}
+		cols := map[string]bool{"id": true}
 		for _, c := range t.Columns {
 			cols[c.Name] = true
 		}

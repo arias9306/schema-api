@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.5] - 2026-08-29
+
+### Added
+
+- Add TableEndpoint and Join types for enhanced schema definition
+- Add table endpoint functionality with request handling and response generation
+- Initialize column map with 'id' for table validation and add test for endpoint joins
+- Implement table endpoint registration and handler logic in API
+- Add 'format' to 'title' and 'created_at' column for posts schema
+- Add Modern Go Guidelines skill with installation scripts and versioning
+
+### Changed
+
+- Improve formatting and punctuation in README.md
+- Simplify error handling and status assignment using cmp package
+- Replace custom error and JSON response handling with httputil package
+- Streamline endpoint registration and context handling using httputil package
+- Enhance schema definitions and examples
+- Merge pull request #3 from arias9306/support-query-tables
+
 ## [0.0.4] - 2026-08-22
 
 ### Added
@@ -14,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Enhance data generation with additional formats and types in fakegen
+- Update changelog for v0.0.4
 
 ## [0.0.3] - 2026-08-19
 
@@ -93,6 +114,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Correct receiver name in HasErrors method for consistency
 - Correct property names for min_length and max_length in users table
 
+[0.0.5]: https://github.com/arias9306/schema-api/compare/v0.0.4..v0.0.5
 [0.0.4]: https://github.com/arias9306/schema-api/compare/v0.0.3..v0.0.4
 [0.0.3]: https://github.com/arias9306/schema-api/compare/v0.0.2..v0.0.3
 [0.0.2]: https://github.com/arias9306/schema-api/compare/v0.0.1..v0.0.2

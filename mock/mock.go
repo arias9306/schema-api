@@ -6,13 +6,13 @@ import (
 	"cmp"
 	"encoding/json"
 	"fmt"
-	"log"
 	"math/rand"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/arias9306/schema-api/fakegen"
+	"github.com/arias9306/schema-api/httputil"
 	"github.com/arias9306/schema-api/schema"
 )
 
@@ -99,11 +99,11 @@ func (h *Handler) handlerFor(i int) http.HandlerFunc {
 
 		rendered, err := Render(e.Response, rand.New(rand.NewSource(time.Now().UnixNano())), ctx)
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, "rendering response: %v", err)
+			httputil.WriteError(w, http.StatusInternalServerError, "rendering response: %v", err)
 			return
 		}
 
-		writeJSON(w, status, rendered)
+		httputil.WriteJSON(w, status, rendered)
 	}
 }
 
@@ -113,18 +113,6 @@ func referencesBody(template any) bool {
 		return false
 	}
 	return strings.Contains(string(data), "{{body")
-}
-
-func writeError(w http.ResponseWriter, status int, format string, args ...any) {
-	writeJSON(w, status, map[string]string{"error": fmt.Sprintf(format, args...)})
-}
-
-func writeJSON(w http.ResponseWriter, status int, value any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(value); err != nil {
-		log.Printf("failed to encode response: %v", err)
-	}
 }
 
 type renderer struct {

@@ -32,7 +32,7 @@ func NewHandler(endpoints []schema.Endpoint) *Handler {
 func (h *Handler) Register(mux *http.ServeMux) (err error) {
 	seen := make(map[string]bool, len(h.endpoints))
 	for _, e := range h.endpoints {
-		pattern := strings.ToUpper(strings.TrimSpace(e.Method)) + " " + e.Path
+		pattern := httputil.RouteKey(e.Method, e.Path)
 		if seen[pattern] {
 			return fmt.Errorf("duplicate endpoint pattern %q", pattern)
 		}
@@ -40,7 +40,7 @@ func (h *Handler) Register(mux *http.ServeMux) (err error) {
 	}
 
 	for i := range h.endpoints {
-		pattern := strings.ToUpper(strings.TrimSpace(h.endpoints[i].Method)) + " " + h.endpoints[i].Path
+		pattern := httputil.RouteKey(h.endpoints[i].Method, h.endpoints[i].Path)
 
 		func() {
 			defer func() {
@@ -64,32 +64,7 @@ func (h *Handler) handlerFor(i int) http.HandlerFunc {
 	e := h.endpoints[i]
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := map[string]string{}
-
-		for _, name := range e.ParamNames() {
-			ctx["path."+name] = r.PathValue(name)
-		}
-
-		for name, values := range r.URL.Query() {
-			if len(values) > 0 {
-				ctx["query."+name] = values[0]
-			}
-		}
-
-		for name, values := range r.Header {
-			if len(values) > 0 {
-				ctx["header."+strings.ToLower(name)] = values[0]
-			}
-		}
-
-		if h.bodyRefs[i] {
-			var body map[string]any
-			if err := json.NewDecoder(r.Body).Decode(&body); err == nil {
-				for name, value := range body {
-					ctx["body."+name] = fmt.Sprintf("%v", value)
-				}
-			}
-		}
+		ctx := httputil.BuildRequestContext(r, e.ParamNames(), h.bodyRefs[i])
 
 		status := cmp.Or(e.Status, http.StatusOK)
 
@@ -169,7 +144,7 @@ func (r *renderer) renderSpec(t string, v map[string]any, name string) (any, err
 	switch t {
 	case "array":
 		count := 1
-		if c, ok := plainInt(v["count"]); ok && c > 0 {
+		if c, ok := fakegen.AsInt(v["count"]); ok && c > 0 {
 			count = c
 		}
 
@@ -197,12 +172,7 @@ func (r *renderer) renderSpec(t string, v map[string]any, name string) (any, err
 		return out, nil
 
 	default:
-		spec := specFromMap(v)
-		if spec.Type == "string" && spec.Format == "" && name != "" {
-			if format := fakegen.ResolveFormat(name); format != "" {
-				spec.Format = format
-			}
-		}
+		spec := fakegen.SpecFromMap(v, name)
 
 		val, err := fakegen.Value(r.rand, spec)
 		if err != nil {
@@ -210,73 +180,6 @@ func (r *renderer) renderSpec(t string, v map[string]any, name string) (any, err
 		}
 		return val, nil
 	}
-}
-
-func specFromMap(value map[string]any) fakegen.Spec {
-	spec := fakegen.Spec{}
-
-	if t, ok := value["type"].(string); ok {
-		spec.Type = t
-	}
-
-	if f, ok := floatValue(value["min"]); ok {
-		spec.Min = f
-	}
-
-	if f, ok := floatValue(value["max"]); ok {
-		spec.Max = f
-	}
-
-	if n, ok := intValue(value["min_length"]); ok {
-		spec.MinLength = n
-	}
-
-	if n, ok := intValue(value["max_length"]); ok {
-		spec.MaxLength = n
-	}
-
-	if rg, ok := value["regex"].(string); ok {
-		spec.Regex = rg
-	}
-
-	if format, ok := value["format"].(string); ok {
-		spec.Format = format
-	}
-
-	if def, ok := value["default"]; ok {
-		spec.Default = def
-	}
-
-	return spec
-}
-
-func floatValue(value any) (*float64, bool) {
-	switch n := value.(type) {
-	case float64:
-		return &n, true
-	case int:
-		f := float64(n)
-		return &f, true
-	}
-	return nil, false
-}
-
-func intValue(value any) (*int, bool) {
-	n, ok := plainInt(value)
-	if !ok {
-		return nil, false
-	}
-	return &n, true
-}
-
-func plainInt(value any) (int, bool) {
-	switch n := value.(type) {
-	case float64:
-		return int(n), true
-	case int:
-		return n, true
-	}
-	return 0, false
 }
 
 func (r *renderer) interpolate(s string) string {

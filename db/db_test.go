@@ -285,10 +285,10 @@ func TestConvertValue(t *testing.T) {
 	sch := createTestTables(t, openTestDB(t))
 	users := sch.Tables[0]
 
-	assert.Equal(t, true, convertValue("active", int64(1), users))
-	assert.Equal(t, false, convertValue("active", int64(0), users))
-	assert.Equal(t, "text", convertValue("name", []byte("text"), users))
-	assert.Equal(t, int64(5), convertValue("age", int64(5), users))
+	assert.Equal(t, true, ConvertValue("active", int64(1), users))
+	assert.Equal(t, false, ConvertValue("active", int64(0), users))
+	assert.Equal(t, "text", ConvertValue("name", []byte("text"), users))
+	assert.Equal(t, int64(5), ConvertValue("age", int64(5), users))
 }
 
 func TestQuoteIdent(t *testing.T) {

@@ -102,7 +102,7 @@ func SelectAll(db *sql.DB, table schema.Table, page int, limit int, sort string,
 
 		row := make(map[string]any)
 		for i, col := range cols {
-			row[col] = convertValue(col, values[i], table)
+			row[col] = ConvertValue(col, values[i], table)
 		}
 		results = append(results, row)
 	}
@@ -213,7 +213,7 @@ func scanRow(rows *sql.Rows, table schema.Table) (map[string]any, error) {
 
 	result := make(map[string]any)
 	for i, column := range columns {
-		result[column] = convertValue(column, values[i], table)
+		result[column] = ConvertValue(column, values[i], table)
 	}
 
 	return result, nil
@@ -246,7 +246,7 @@ func sanitizeOrder(order string) string {
 	return order
 }
 
-func convertValue(colName string, value any, table schema.Table) any {
+func ConvertValue(colName string, value any, table schema.Table) any {
 	if b, ok := value.([]byte); ok {
 		value = string(b)
 	}

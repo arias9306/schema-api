@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/arias9306/schema-api/db"
 	"github.com/arias9306/schema-api/httputil"
@@ -47,7 +46,7 @@ func (h *Handler) RegisterTableEndpoints(mux *http.ServeMux) error {
 	seen := make(map[string]bool, len(h.schema.TableEndpoints))
 	for i := range h.schema.TableEndpoints {
 		ep := &h.schema.TableEndpoints[i]
-		pattern := strings.ToUpper(strings.TrimSpace(ep.Method)) + " " + ep.Path
+		pattern := httputil.RouteKey(ep.Method, ep.Path)
 		if seen[pattern] {
 			return fmt.Errorf("duplicate table endpoint pattern %q", pattern)
 		}
@@ -56,7 +55,7 @@ func (h *Handler) RegisterTableEndpoints(mux *http.ServeMux) error {
 
 	for i := range h.schema.TableEndpoints {
 		ep := &h.schema.TableEndpoints[i]
-		pattern := strings.ToUpper(strings.TrimSpace(ep.Method)) + " " + ep.Path
+		pattern := httputil.RouteKey(ep.Method, ep.Path)
 		mux.HandleFunc(pattern, h.handlerFor(i))
 	}
 
@@ -65,25 +64,10 @@ func (h *Handler) RegisterTableEndpoints(mux *http.ServeMux) error {
 
 func (h *Handler) handlerFor(i int) http.HandlerFunc {
 	ep := &h.schema.TableEndpoints[i]
+	table := h.tables[ep.Tables[0]]
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := map[string]string{}
-
-		for _, name := range ep.ParamNames() {
-			ctx["path."+name] = r.PathValue(name)
-		}
-
-		for name, values := range r.URL.Query() {
-			if len(values) > 0 {
-				ctx["query."+name] = values[0]
-			}
-		}
-
-		for name, values := range r.Header {
-			if len(values) > 0 {
-				ctx["header."+strings.ToLower(name)] = values[0]
-			}
-		}
+		ctx := httputil.BuildRequestContext(r, schema.ParamNames(ep.Path), false)
 
 		query, params, err := db.BuildQuery(*ep, h.tables, ctx)
 		if err != nil {
@@ -98,7 +82,7 @@ func (h *Handler) handlerFor(i int) http.HandlerFunc {
 		}
 		defer rows.Close()
 
-		results, err := scanRows(rows)
+		results, err := scanRows(rows, table)
 		if err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "scanning rows: %v", err)
 			return
@@ -342,7 +326,7 @@ func writeConstraintError(w http.ResponseWriter, code int) {
 	}
 }
 
-func scanRows(rows *sql.Rows) ([]map[string]any, error) {
+func scanRows(rows *sql.Rows, table schema.Table) ([]map[string]any, error) {
 	cols, err := rows.Columns()
 	if err != nil {
 		return nil, err
@@ -362,11 +346,7 @@ func scanRows(rows *sql.Rows) ([]map[string]any, error) {
 
 		row := make(map[string]any, len(cols))
 		for i, col := range cols {
-			v := values[i]
-			if b, ok := v.([]byte); ok {
-				v = string(b)
-			}
-			row[col] = v
+			row[col] = db.ConvertValue(col, values[i], table)
 		}
 		results = append(results, row)
 	}

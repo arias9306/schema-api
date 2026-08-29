@@ -4,14 +4,12 @@ package db
 import (
 	"fmt"
 	"math/rand"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/arias9306/schema-api/fakegen"
+	"github.com/arias9306/schema-api/template"
 )
-
-var responseRefRegex = regexp.MustCompile(`\{\{\s*([^{}]+?)\s*\}\}`)
 
 func BuildTableEndpointResponse(template any, rows []map[string]any) any {
 	var firstRow map[string]any
@@ -75,7 +73,7 @@ func resolveString(s string, row map[string]any) any {
 	var b strings.Builder
 	last := 0
 	resolvedAny := false
-	matches := responseRefRegex.FindAllStringSubmatchIndex(s, -1)
+	matches := template.RefRegex.FindAllStringSubmatchIndex(s, -1)
 
 	for _, m := range matches {
 		start, end := m[0], m[1]
@@ -113,70 +111,18 @@ func resolveString(s string, row map[string]any) any {
 
 func isSinglePlaceholder(s string) bool {
 	trimmed := strings.TrimSpace(s)
-	return responseRefRegex.MatchString(trimmed) &&
-		responseRefRegex.ReplaceAllString(trimmed, "") == ""
+	return template.RefRegex.MatchString(trimmed) &&
+		template.RefRegex.ReplaceAllString(trimmed, "") == ""
 }
 
 var specRand = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 func renderSpec(spec map[string]any) any {
-	s := fakegen.Spec{}
-	if t, ok := spec["type"].(string); ok {
-		s.Type = t
-	}
-	if f := floatPtr(spec["min"]); f != nil {
-		s.Min = f
-	}
-	if f := floatPtr(spec["max"]); f != nil {
-		s.Max = f
-	}
-	if n := intPtr(spec["min_length"]); n != nil {
-		s.MinLength = n
-	}
-	if n := intPtr(spec["max_length"]); n != nil {
-		s.MaxLength = n
-	}
-	if r, ok := spec["regex"].(string); ok {
-		s.Regex = r
-	}
-	if f, ok := spec["format"].(string); ok {
-		s.Format = f
-	}
-	if d, ok := spec["default"]; ok {
-		s.Default = d
-	}
+	s := fakegen.SpecFromMap(spec, "")
 
 	val, err := fakegen.Value(specRand, s)
 	if err != nil {
 		return nil
 	}
 	return val
-}
-
-func floatPtr(v any) *float64 {
-	switch n := v.(type) {
-	case float64:
-		return &n
-	case int:
-		f := float64(n)
-		return &f
-	case int64:
-		f := float64(n)
-		return &f
-	}
-	return nil
-}
-
-func intPtr(v any) *int {
-	switch n := v.(type) {
-	case float64:
-		i := int(n)
-		return &i
-	case int:
-		return &n
-	case int64:
-		i := int(n)
-		return &i
-	}
-	return nil
 }

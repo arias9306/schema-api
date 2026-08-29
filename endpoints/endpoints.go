@@ -17,29 +17,19 @@ type Info struct {
 	Status string
 }
 
-var crudRoutes = []struct {
-	method string
-	suffix string
-	status int
-}{
-	{"GET", "", 200},
-	{"GET", "/{id}", 200},
-	{"POST", "", 201},
-	{"PUT", "/{id}", 200},
-	{"DELETE", "/{id}", 204},
-}
+var crudRoutes = schema.CRUDRoutes
 
 func Collect(s *schema.Schema) []Info {
 	var routes []Info
 
 	for _, table := range s.Tables {
 		for _, route := range crudRoutes {
-			path := "/" + table.Name + route.suffix
+			path := "/" + table.Name + route.Suffix
 			routes = append(routes, Info{
-				Method: route.method,
+				Method: route.Method,
 				Path:   path,
 				Source: "crud",
-				Status: strconv.Itoa(route.status),
+				Status: strconv.Itoa(route.Status),
 			})
 		}
 	}

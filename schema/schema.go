@@ -5,13 +5,14 @@ import (
 	"cmp"
 	"encoding/json"
 	"fmt"
-	"maps"
 	"os"
 	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/arias9306/schema-api/fakegen"
+	"github.com/arias9306/schema-api/httputil"
+	"github.com/arias9306/schema-api/template"
 )
 
 type ForeignKey struct {
@@ -91,36 +92,6 @@ var identifierPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*$`)
 
 var tableColumnRegex = regexp.MustCompile(`([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)`)
 
-var wherePlaceholderRegex = regexp.MustCompile(`\{\{[^}]*\}\}`)
-
-var templateRefRegex = regexp.MustCompile(`\{\{\s*([^{}]+?)\s*\}\}`)
-
-func extractTableColumnRefs(template any) []string {
-	refs := map[string]bool{}
-	walkTemplateRefs(template, refs)
-	return slices.Collect(maps.Keys(refs))
-}
-
-func walkTemplateRefs(v any, refs map[string]bool) {
-	switch val := v.(type) {
-	case string:
-		for _, m := range templateRefRegex.FindAllStringSubmatch(val, -1) {
-			expr := strings.TrimSpace(m[1])
-			if strings.Contains(expr, ".") {
-				refs[expr] = true
-			}
-		}
-	case []any:
-		for _, item := range val {
-			walkTemplateRefs(item, refs)
-		}
-	case map[string]any:
-		for _, item := range val {
-			walkTemplateRefs(item, refs)
-		}
-	}
-}
-
 var validColumnTypes = map[string]bool{
 	"string":   true,
 	"int":      true,
@@ -129,17 +100,37 @@ var validColumnTypes = map[string]bool{
 	"datetime": true,
 }
 
+// CRUDRoutes lists the conventional CRUD routes generated for every table,
+// with the default status code for each.
+var CRUDRoutes = []struct {
+	Method string
+	Suffix string
+	Status int
+}{
+	{"GET", "", 200},
+	{"GET", "/{id}", 200},
+	{"POST", "", 201},
+	{"PUT", "/{id}", 200},
+	{"DELETE", "/{id}", 204},
+}
+
+// IsValidColumnType reports whether t is a supported column type.
+func IsValidColumnType(t string) bool {
+	return validColumnTypes[t]
+}
+
 func (e Endpoint) ParamNames() []string {
-	matches := wildcardPattern.FindAllStringSubmatch(e.Path, -1)
-	names := make([]string, 0, len(matches))
-	for _, m := range matches {
-		names = append(names, m[1])
-	}
-	return names
+	return ParamNames(e.Path)
 }
 
 func (e TableEndpoint) ParamNames() []string {
-	matches := wildcardPattern.FindAllStringSubmatch(e.Path, -1)
+	return ParamNames(e.Path)
+}
+
+// ParamNames returns the path-parameter names declared in a route path,
+// e.g. "/users/{id}" yields ["id"].
+func ParamNames(path string) []string {
+	matches := wildcardPattern.FindAllStringSubmatch(path, -1)
 	names := make([]string, 0, len(matches))
 	for _, m := range matches {
 		names = append(names, m[1])
@@ -293,7 +284,7 @@ func (s *Schema) validateEndpoints(errors *[]string) {
 
 		endpoint.Status = cmp.Or(endpoint.Status, 200)
 
-		key := endpoint.Method + " " + endpoint.Path
+		key := httputil.RouteKey(endpoint.Method, endpoint.Path)
 		if first, ok := seen[key]; ok {
 			*errors = append(*errors, fmt.Sprintf("%s (%s): duplicate pattern, already defined at endpoints[%d]", label, key, first))
 		} else {
@@ -318,19 +309,13 @@ func (s *Schema) validateTableEndpoints(errors *[]string) {
 
 	crudPatterns := map[string]bool{}
 	for _, t := range s.Tables {
-		for _, route := range []string{
-			"GET /" + t.Name,
-			"GET /" + t.Name + "/{id}",
-			"POST /" + t.Name,
-			"PUT /" + t.Name + "/{id}",
-			"DELETE /" + t.Name + "/{id}",
-		} {
-			crudPatterns[route] = true
+		for _, route := range CRUDRoutes {
+			crudPatterns[httputil.RouteKey(route.Method, "/"+t.Name+route.Suffix)] = true
 		}
 	}
 
 	for i := range s.Endpoints {
-		key := strings.ToUpper(strings.TrimSpace(s.Endpoints[i].Method)) + " " + s.Endpoints[i].Path
+		key := httputil.RouteKey(s.Endpoints[i].Method, s.Endpoints[i].Path)
 		seen[key] = i
 	}
 
@@ -379,8 +364,8 @@ func (s *Schema) validateTableEndpoints(errors *[]string) {
 
 		for _, join := range ep.Joins {
 			checkJoinRef := func(ref string, which string) {
-				left, right, ok := strings.Cut(ref, ".")
-				if !ok || !validIdentifier(left) || !validIdentifier(right) {
+				left, right := template.SplitRef(ref)
+				if !validIdentifier(left) || !validIdentifier(right) {
 					*errors = append(*errors, fmt.Sprintf("%s (%s %s): join %s %q must be in table.column format", label, ep.Method, ep.Path, which, ref))
 					return
 				}
@@ -397,7 +382,7 @@ func (s *Schema) validateTableEndpoints(errors *[]string) {
 		}
 
 		for _, cond := range ep.Where {
-			stripped := wherePlaceholderRegex.ReplaceAllString(cond, "")
+			stripped := template.RefRegex.ReplaceAllString(cond, "")
 			for _, m := range tableColumnRegex.FindAllStringSubmatch(stripped, -1) {
 				if !tablesSet[m[1]] {
 					*errors = append(*errors, fmt.Sprintf("%s (%s %s): where condition references unknown table %q", label, ep.Method, ep.Path, m[1]))
@@ -406,11 +391,8 @@ func (s *Schema) validateTableEndpoints(errors *[]string) {
 		}
 
 		if ep.Response != nil {
-			for _, ref := range extractTableColumnRefs(ep.Response) {
-				left, right, ok := strings.Cut(ref, ".")
-				if !ok {
-					continue
-				}
+			for _, ref := range template.CollectRefs(ep.Response) {
+				left, right := template.SplitRef(ref)
 				if !tablesSet[left] {
 					continue
 				}
@@ -420,7 +402,7 @@ func (s *Schema) validateTableEndpoints(errors *[]string) {
 			}
 		}
 
-		key := strings.ToUpper(strings.TrimSpace(ep.Method)) + " " + ep.Path
+		key := httputil.RouteKey(ep.Method, ep.Path)
 		if first, ok := seen[key]; ok {
 			*errors = append(*errors, fmt.Sprintf("%s (%s): duplicate pattern, already defined at index %d", label, key, first))
 		} else if crudPatterns[key] {

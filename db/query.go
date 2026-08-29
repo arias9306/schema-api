@@ -3,31 +3,26 @@ package db
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/arias9306/schema-api/schema"
+	"github.com/arias9306/schema-api/template"
 )
 
 const aliasSep = "__"
-
-var refRegex = regexp.MustCompile(`\{\{\s*([^{}]+?)\s*\}\}`)
 
 func aliasOf(table, column string) string {
 	return table + aliasSep + column
 }
 
 func BuildSelectColumns(response any, tables []string, tableMap map[string]schema.Table) string {
-	refs := collectColumnRefs(response)
+	refs := template.CollectRefs(response)
 
 	columns := make([]string, 0, len(refs)+len(tables))
 	for _, table := range tables {
 		columns = append(columns, columnAlias(table, "id"))
-		for ref := range refs {
-			left, right, ok := strings.Cut(ref, ".")
-			if !ok {
-				continue
-			}
+		for _, ref := range refs {
+			left, right := template.SplitRef(ref)
 			if left == table && right != "id" {
 				columns = append(columns, columnAlias(table, right))
 			}
@@ -39,32 +34,6 @@ func BuildSelectColumns(response any, tables []string, tableMap map[string]schem
 
 func columnAlias(table, column string) string {
 	return fmt.Sprintf("%s.%s AS %s", quoteIdent(table), quoteIdent(column), quoteIdent(aliasOf(table, column)))
-}
-
-func collectColumnRefs(template any) map[string]bool {
-	refs := map[string]bool{}
-	walkRefs(template, refs)
-	return refs
-}
-
-func walkRefs(v any, refs map[string]bool) {
-	switch val := v.(type) {
-	case string:
-		for _, m := range refRegex.FindAllStringSubmatch(val, -1) {
-			expr := strings.TrimSpace(m[1])
-			if strings.Contains(expr, ".") {
-				refs[expr] = true
-			}
-		}
-	case []any:
-		for _, item := range val {
-			walkRefs(item, refs)
-		}
-	case map[string]any:
-		for _, item := range val {
-			walkRefs(item, refs)
-		}
-	}
 }
 
 func InferJoins(tables []string, tableMap map[string]schema.Table) ([]schema.Join, error) {
@@ -124,37 +93,24 @@ func BuildJoinClause(joins []schema.Join) string {
 			joinType = "INNER"
 		}
 
-		local := splitRef(join.On.Local)
-		foreign := splitRef(join.On.Foreign)
+		localTable, localColumn := template.SplitRef(join.On.Local)
+		foreignTable, foreignColumn := template.SplitRef(join.On.Foreign)
 
 		b.WriteString(" ")
 		b.WriteString(joinType)
 		b.WriteString(" JOIN ")
-		b.WriteString(quoteIdent(foreign.table))
+		b.WriteString(quoteIdent(foreignTable))
 		b.WriteString(" ON ")
-		b.WriteString(quoteIdent(local.table))
+		b.WriteString(quoteIdent(localTable))
 		b.WriteString(".")
-		b.WriteString(quoteIdent(local.column))
+		b.WriteString(quoteIdent(localColumn))
 		b.WriteString(" = ")
-		b.WriteString(quoteIdent(foreign.table))
+		b.WriteString(quoteIdent(foreignTable))
 		b.WriteString(".")
-		b.WriteString(quoteIdent(foreign.column))
+		b.WriteString(quoteIdent(foreignColumn))
 	}
 
 	return b.String()
-}
-
-type tableColumn struct {
-	table  string
-	column string
-}
-
-func splitRef(ref string) tableColumn {
-	table, column, ok := strings.Cut(ref, ".")
-	if !ok {
-		return tableColumn{}
-	}
-	return tableColumn{table: table, column: column}
 }
 
 func InterpolateWhere(conditions []string, ctx map[string]string) (string, []any, error) {
@@ -164,7 +120,7 @@ func InterpolateWhere(conditions []string, ctx map[string]string) (string, []any
 	for _, cond := range conditions {
 		var b strings.Builder
 		last := 0
-		matches := refRegex.FindAllStringSubmatchIndex(cond, -1)
+		matches := template.RefRegex.FindAllStringSubmatchIndex(cond, -1)
 
 		for _, m := range matches {
 			start, end := m[0], m[1]

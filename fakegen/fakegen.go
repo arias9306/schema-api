@@ -598,3 +598,71 @@ func GenSentence(rng *rand.Rand) string {
 	words[0] = strings.ToUpper(w[:1]) + w[1:]
 	return strings.Join(words, " ") + "."
 }
+
+func SpecFromMap(m map[string]any, name string) Spec {
+	spec := Spec{}
+
+	if t, ok := m["type"].(string); ok {
+		spec.Type = t
+	}
+
+	if f, ok := AsFloat64(m["min"]); ok {
+		spec.Min = &f
+	}
+
+	if f, ok := AsFloat64(m["max"]); ok {
+		spec.Max = &f
+	}
+
+	if n, ok := AsInt(m["min_length"]); ok {
+		spec.MinLength = &n
+	}
+
+	if n, ok := AsInt(m["max_length"]); ok {
+		spec.MaxLength = &n
+	}
+
+	if rg, ok := m["regex"].(string); ok {
+		spec.Regex = rg
+	}
+
+	if format, ok := m["format"].(string); ok {
+		spec.Format = format
+	}
+
+	if def, ok := m["default"]; ok {
+		spec.Default = def
+	}
+
+	if spec.Type == "string" && spec.Format == "" && name != "" {
+		if format := ResolveFormat(name); format != "" {
+			spec.Format = format
+		}
+	}
+
+	return spec
+}
+
+func AsFloat64(v any) (float64, bool) {
+	switch n := v.(type) {
+	case float64:
+		return n, true
+	case int:
+		return float64(n), true
+	case int64:
+		return float64(n), true
+	}
+	return 0, false
+}
+
+func AsInt(v any) (int, bool) {
+	switch n := v.(type) {
+	case float64:
+		return int(n), true
+	case int:
+		return n, true
+	case int64:
+		return int(n), true
+	}
+	return 0, false
+}

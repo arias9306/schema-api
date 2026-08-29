@@ -3,9 +3,28 @@
     {
       "name": "users",
       "columns": [
-        { "name": "name", "type": "string", "required": true, "min_length": 2, "max_length": 50, "format": "name" },
-        { "name": "email", "type": "string", "required": true, "unique": true, "format": "email" },
-        { "name": "username", "type": "string", "unique": true, "min_length": 3, "max_length": 20 },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "min_length": 2,
+          "max_length": 50,
+          "format": "name"
+        },
+        {
+          "name": "email",
+          "type": "string",
+          "required": true,
+          "unique": true,
+          "format": "email"
+        },
+        {
+          "name": "username",
+          "type": "string",
+          "unique": true,
+          "min_length": 3,
+          "max_length": 20
+        },
         { "name": "age", "type": "int", "min": 18, "max": 120, "default": 18 },
         { "name": "score", "type": "float", "min": 0.0, "max": 100.0 },
         { "name": "active", "type": "bool", "default": true },
@@ -21,19 +40,107 @@
     {
       "name": "posts",
       "columns": [
-        { "name": "title", "type": "string", "required": true, "min_length": 3, "max_length": 120 },
+        {
+          "name": "title",
+          "type": "string",
+          "required": true,
+          "min_length": 3,
+          "max_length": 120
+        },
         { "name": "body", "type": "string", "max_length": 2000 },
-        { "name": "status", "type": "string", "regex": "^(draft|published|archived)$", "default": "draft" },
-        { "name": "user_id", "type": "int", "foreign_key": { "table": "users", "column": "id" } }
+        {
+          "name": "status",
+          "type": "string",
+          "regex": "^(draft|published|archived)$",
+          "default": "draft"
+        },
+        {
+          "name": "user_id",
+          "type": "int",
+          "foreign_key": { "table": "users", "column": "id" }
+        }
       ]
     },
     {
       "name": "comments",
       "columns": [
-        { "name": "content", "type": "string", "required": true, "max_length": 500 },
-        { "name": "post_id", "type": "int", "foreign_key": { "table": "posts", "column": "id" } },
-        { "name": "author_id", "type": "int", "foreign_key": { "table": "users", "column": "id" } }
+        {
+          "name": "content",
+          "type": "string",
+          "required": true,
+          "max_length": 500
+        },
+        {
+          "name": "post_id",
+          "type": "int",
+          "foreign_key": { "table": "posts", "column": "id" }
+        },
+        {
+          "name": "author_id",
+          "type": "int",
+          "foreign_key": { "table": "users", "column": "id" }
+        }
       ]
+    }
+  ],
+  "table_endpoints": [
+    {
+      "method": "GET",
+      "path": "/users/{id}/posts",
+      "status": 200,
+      "headers": { "X-Source": "database" },
+      "tables": ["users", "posts"],
+      "joins": [
+        {
+          "type": "INNER",
+          "on": { "local": "users.id", "foreign": "posts.user_id" }
+        }
+      ],
+      "where": ["users.id = {{path.id}}"],
+      "order_by": "posts.id DESC",
+      "limit": 10,
+      "response": {
+        "user_name": "{{users.name}}",
+        "user_email": "{{users.email}}",
+        "posts": {
+          "type": "array",
+          "items": {
+            "title": "{{posts.title}}",
+            "body": "{{posts.body}}"
+          }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/posts/{id}/comments",
+      "status": 200,
+      "headers": { "X-Source": "database" },
+      "tables": ["posts", "comments", "users"],
+      "joins": [
+        {
+          "type": "INNER",
+          "on": { "local": "posts.id", "foreign": "comments.post_id" }
+        },
+        {
+          "type": "INNER",
+          "on": { "local": "comments.author_id", "foreign": "users.id" }
+        }
+      ],
+      "where": ["posts.id = {{path.id}}"],
+      "order_by": "comments.created_at DESC",
+      "limit": 50,
+      "response": {
+        "post_title": "{{posts.title}}",
+        "comments": {
+          "type": "array",
+          "items": {
+            "content": "{{comments.content}}",
+            "commenter": "{{users.name}}",
+            "created_at": "{{comments.created_at}}"
+          }
+        }
+      }
     }
   ],
   "endpoints": [
@@ -53,14 +160,22 @@
         "score": { "type": "float", "min": 0, "max": 100 },
         "active": { "type": "bool" },
         "joined": { "type": "datetime" },
-        "tags": { "type": "array", "count": 5, "items": { "type": "string", "max_length": 10 } },
+        "tags": {
+          "type": "array",
+          "count": 5,
+          "items": { "type": "string", "max_length": 10 }
+        },
         "address": {
           "type": "object",
           "properties": {
             "street": { "type": "string", "format": "address" },
             "city": { "type": "string" },
             "country": { "type": "string" },
-            "coordinates": { "type": "array", "count": 2, "items": { "type": "float", "min": -180, "max": 180 } }
+            "coordinates": {
+              "type": "array",
+              "count": 2,
+              "items": { "type": "float", "min": -180, "max": 180 }
+            }
           }
         },
         "server_time": "{{now}}",

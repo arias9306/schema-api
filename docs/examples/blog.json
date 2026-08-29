@@ -3,39 +3,86 @@
     {
       "name": "authors",
       "columns": [
-        {"name": "name",     "type": "string",  "format": "name"},
-        {"name": "email",    "type": "string",  "unique": true},
-        {"name": "username", "type": "string",  "unique": true},
-        {"name": "avatar",   "type": "string",  "format": "url"},
-        {"name": "bio",      "type": "string",  "min_length": 20, "max_length": 200}
+        { "name": "name", "type": "string", "format": "name" },
+        { "name": "email", "type": "string", "unique": true },
+        { "name": "username", "type": "string", "unique": true },
+        { "name": "avatar", "type": "string", "format": "url" },
+        { "name": "bio", "type": "string", "min_length": 20, "max_length": 200 }
       ]
     },
     {
       "name": "posts",
       "columns": [
-        {"name": "author_id",   "type": "int",     "foreign_key": {"table": "authors", "column": "id"}},
-        {"name": "title",       "type": "string",  "min_length": 5, "max_length": 100},
-        {"name": "slug",        "type": "string",  "unique": true, "regex": "^[a-z0-9]+(-[a-z0-9]+)*$"},
-        {"name": "body",        "type": "string",  "min_length": 50, "max_length": 5000},
-        {"name": "status",      "type": "string",  "regex": "draft|published|archived"},
-        {"name": "published_at", "type": "datetime"},
-        {"name": "view_count",  "type": "int",     "min": 0, "max": 1000000}
+        {
+          "name": "author_id",
+          "type": "int",
+          "foreign_key": { "table": "authors", "column": "id" }
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "min_length": 5,
+          "max_length": 100
+        },
+        {
+          "name": "slug",
+          "type": "string",
+          "unique": true,
+          "regex": "^[a-z0-9]+(-[a-z0-9]+)*$"
+        },
+        {
+          "name": "body",
+          "type": "string",
+          "min_length": 50,
+          "max_length": 5000
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "regex": "draft|published|archived"
+        },
+        { "name": "published_at", "type": "datetime" },
+        { "name": "view_count", "type": "int", "min": 0, "max": 1000000 }
       ]
     },
     {
       "name": "comments",
       "columns": [
-        {"name": "post_id",    "type": "int", "foreign_key": {"table": "posts", "column": "id"}},
-        {"name": "author_id",  "type": "int", "foreign_key": {"table": "authors", "column": "id"}},
-        {"name": "content",    "type": "string", "min_length": 1, "max_length": 1000},
-        {"name": "created_at", "type": "datetime", "default": "now"}
+        {
+          "name": "post_id",
+          "type": "int",
+          "foreign_key": { "table": "posts", "column": "id" }
+        },
+        {
+          "name": "author_id",
+          "type": "int",
+          "foreign_key": { "table": "authors", "column": "id" }
+        },
+        {
+          "name": "content",
+          "type": "string",
+          "min_length": 1,
+          "max_length": 1000
+        },
+        { "name": "created_at", "type": "datetime", "default": "now" }
       ]
     },
     {
       "name": "tags",
       "columns": [
-        {"name": "name",  "type": "string", "unique": true, "min_length": 2, "max_length": 30},
-        {"name": "slug",  "type": "string", "unique": true, "regex": "^[a-z0-9]+(-[a-z0-9]+)*$"}
+        {
+          "name": "name",
+          "type": "string",
+          "unique": true,
+          "min_length": 2,
+          "max_length": 30
+        },
+        {
+          "name": "slug",
+          "type": "string",
+          "unique": true,
+          "regex": "^[a-z0-9]+(-[a-z0-9]+)*$"
+        }
       ]
     }
   ],
@@ -51,9 +98,9 @@
             "type": "array",
             "count": 5,
             "items": {
-              "title":  {"type": "string", "min_length": 10, "max_length": 60},
-              "author": {"type": "string", "format": "name"},
-              "score":  {"type": "float", "min": 0.5, "max": 1.0}
+              "title": { "type": "string", "min_length": 10, "max_length": 60 },
+              "author": { "type": "string", "format": "name" },
+              "score": { "type": "float", "min": 0.5, "max": 1.0 }
             }
           }
         }
@@ -69,14 +116,83 @@
             "type": "array",
             "count": 10,
             "items": {
-              "title":      {"type": "string", "min_length": 10, "max_length": 60},
-              "author":     {"type": "string", "format": "name"},
-              "summary":    {"type": "string", "min_length": 20, "max_length": 100},
-              "tags":       {"type": "array", "count": 3, "items": {"type": "string", "min_length": 3, "max_length": 10}},
-              "created_at": {"type": "datetime"}
+              "title": { "type": "string", "min_length": 10, "max_length": 60 },
+              "author": { "type": "string", "format": "name" },
+              "summary": {
+                "type": "string",
+                "min_length": 20,
+                "max_length": 100
+              },
+              "tags": {
+                "type": "array",
+                "count": 3,
+                "items": { "type": "string", "min_length": 3, "max_length": 10 }
+              },
+              "created_at": { "type": "datetime" }
             }
           },
-          "has_more": {"type": "bool"}
+          "has_more": { "type": "bool" }
+        }
+      }
+    }
+  ],
+  "table_endpoints": [
+    {
+      "method": "GET",
+      "path": "/authors/{id}/posts",
+      "status": 200,
+      "headers": { "X-Source": "database" },
+      "tables": ["authors", "posts"],
+      "joins": [
+        {
+          "type": "INNER",
+          "on": { "local": "authors.id", "foreign": "posts.author_id" }
+        }
+      ],
+      "where": ["authors.id = {{path.id}}", "posts.status = 'published'"],
+      "order_by": "posts.published_at DESC",
+      "limit": 20,
+      "response": {
+        "author": "{{authors.name}}",
+        "author_email": "{{authors.email}}",
+        "posts": {
+          "type": "array",
+          "items": {
+            "title": "{{posts.title}}",
+            "slug": "{{posts.slug}}",
+            "view_count": "{{posts.view_count}}"
+          }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/posts/{id}/comments",
+      "status": 200,
+      "headers": { "X-Source": "database" },
+      "tables": ["posts", "comments", "authors"],
+      "joins": [
+        {
+          "type": "INNER",
+          "on": { "local": "posts.id", "foreign": "comments.post_id" }
+        },
+        {
+          "type": "INNER",
+          "on": { "local": "comments.author_id", "foreign": "authors.id" }
+        }
+      ],
+      "where": ["posts.id = {{path.id}}"],
+      "order_by": "comments.created_at DESC",
+      "limit": 50,
+      "response": {
+        "post_title": "{{posts.title}}",
+        "comments": {
+          "type": "array",
+          "items": {
+            "content": "{{comments.content}}",
+            "commenter": "{{authors.name}}",
+            "created_at": "{{comments.created_at}}"
+          }
         }
       }
     }

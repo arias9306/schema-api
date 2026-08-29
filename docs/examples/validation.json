@@ -3,15 +3,61 @@
     {
       "name": "products",
       "columns": [
-        {"name": "title",       "type": "string", "required": true, "min_length": 3, "max_length": 50},
-        {"name": "sku",         "type": "string", "required": true, "unique": true, "regex": "^[A-Z]{2}-\\d{4}$"},
-        {"name": "price",       "type": "float",  "required": true, "min": 0.01, "max": 99999.99},
-        {"name": "weight_kg",   "type": "float",  "min": 0.0, "max": 500.0},
-        {"name": "quantity",    "type": "int",    "required": true, "min": 0, "max": 100000},
-        {"name": "is_active",   "type": "bool",   "default": true},
-        {"name": "launch_date", "type": "datetime"},
-        {"name": "website",     "type": "string", "format": "url"}
+        {
+          "name": "title",
+          "type": "string",
+          "required": true,
+          "min_length": 3,
+          "max_length": 50
+        },
+        {
+          "name": "sku",
+          "type": "string",
+          "required": true,
+          "unique": true,
+          "regex": "^[A-Z]{2}-\\d{4}$"
+        },
+        {
+          "name": "price",
+          "type": "float",
+          "required": true,
+          "min": 0.01,
+          "max": 99999.99
+        },
+        { "name": "weight_kg", "type": "float", "min": 0.0, "max": 500.0 },
+        {
+          "name": "quantity",
+          "type": "int",
+          "required": true,
+          "min": 0,
+          "max": 100000
+        },
+        { "name": "is_active", "type": "bool", "default": true },
+        { "name": "launch_date", "type": "datetime" },
+        { "name": "website", "type": "string", "format": "url" }
       ]
+    }
+  ],
+  "table_endpoints": [
+    {
+      "method": "GET",
+      "path": "/products/top",
+      "status": 200,
+      "headers": { "X-Source": "database" },
+      "tables": ["products"],
+      "where": ["products.is_active = {{query.active}}"],
+      "order_by": "products.price DESC",
+      "limit": 10,
+      "response": {
+        "products": {
+          "type": "array",
+          "items": {
+            "title": "{{products.title}}",
+            "sku": "{{products.sku}}",
+            "price": "{{products.price}}"
+          }
+        }
+      }
     }
   ]
 }

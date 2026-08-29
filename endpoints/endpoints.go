@@ -2,6 +2,7 @@
 package endpoints
 
 import (
+	"cmp"
 	"fmt"
 	"strconv"
 	"strings"
@@ -16,42 +17,39 @@ type Info struct {
 	Status string
 }
 
-var crudRoutes = []struct {
-	method string
-	suffix string
-	status int
-}{
-	{"GET", "", 200},
-	{"GET", "/{id}", 200},
-	{"POST", "", 201},
-	{"PUT", "/{id}", 200},
-	{"DELETE", "/{id}", 204},
-}
+var crudRoutes = schema.CRUDRoutes
 
 func Collect(s *schema.Schema) []Info {
 	var routes []Info
 
 	for _, table := range s.Tables {
 		for _, route := range crudRoutes {
-			path := "/" + table.Name + route.suffix
+			path := "/" + table.Name + route.Suffix
 			routes = append(routes, Info{
-				Method: route.method,
+				Method: route.Method,
 				Path:   path,
 				Source: "crud",
-				Status: strconv.Itoa(route.status),
+				Status: strconv.Itoa(route.Status),
 			})
 		}
 	}
 
 	for _, endpoint := range s.Endpoints {
-		status := endpoint.Status
-		if status == 0 {
-			status = 200
-		}
+		status := cmp.Or(endpoint.Status, 200)
 		routes = append(routes, Info{
 			Method: endpoint.Method,
 			Path:   endpoint.Path,
 			Source: "mock",
+			Status: strconv.Itoa(status),
+		})
+	}
+
+	for _, endpoint := range s.TableEndpoints {
+		status := cmp.Or(endpoint.Status, 200)
+		routes = append(routes, Info{
+			Method: endpoint.Method,
+			Path:   endpoint.Path,
+			Source: "table_endpoint",
 			Status: strconv.Itoa(status),
 		})
 	}
@@ -94,7 +92,7 @@ func formatTable(routes []Info) string {
 		if i > 0 {
 			b.WriteString("  ")
 		}
-		for j := 0; j < w; j++ {
+		for range w {
 			b.WriteString("-")
 		}
 	}

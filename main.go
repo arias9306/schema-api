@@ -69,7 +69,15 @@ func main() {
 			fmt.Println("seeding complete.")
 		}
 
-		api.NewAPIHandler(database, schema).Register(mux)
+		mockHanlder := api.NewAPIHandler(database, schema)
+		mockHanlder.Register(mux)
+
+		if len(schema.TableEndpoints) > 0 {
+			if err := mockHanlder.RegisterTableEndpoints(mux); err != nil {
+				log.Fatalf("failed to register table endpoints: %v", err)
+			}
+			fmt.Println("table endpoints registered.")
+		}
 	}
 
 	if len(schema.Endpoints) > 0 {

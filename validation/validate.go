@@ -3,6 +3,7 @@ package validation
 
 import (
 	"fmt"
+	"maps"
 	"math"
 	"regexp"
 	"strings"
@@ -28,10 +29,8 @@ func (v *ValidationError) HasErrors() bool {
 }
 
 func ValidateCreate(table schema.Table, data map[string]any) (*ValidationError, map[string]any) {
-	cleaned := make(map[string]any)
-	for key, value := range data {
-		cleaned[key] = value
-	}
+	cleaned := make(map[string]any, len(data))
+	maps.Copy(cleaned, data)
 
 	errors := &ValidationError{}
 
@@ -86,6 +85,10 @@ func processDefault(column schema.Column) any {
 }
 
 func validateColumn(column schema.Column, value any) string {
+	if !schema.IsValidColumnType(column.Type) {
+		return fmt.Sprintf("unsupported type: %s", column.Type)
+	}
+
 	switch column.Type {
 	case "string":
 		s, ok := value.(string)
@@ -172,8 +175,6 @@ func validateColumn(column schema.Column, value any) string {
 		if !valid {
 			return "must be a valid datetime (RFC3339 or YYYY-MM-DD HH:MM:SS)"
 		}
-	default:
-		return fmt.Sprintf("unsupported type: %s", column.Type)
 	}
 
 	return ""

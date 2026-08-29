@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/arias9306/schema-api/fakegen"
 	"github.com/arias9306/schema-api/schema"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -193,7 +194,7 @@ func TestSpecFromMap(t *testing.T) {
 	min, max := 1.0, 10.0
 	minLen, maxLen := 3, 9
 
-	spec := specFromMap(map[string]any{
+	spec := fakegen.SpecFromMap(map[string]any{
 		"type":       "string",
 		"min":        1,
 		"max":        10.0,
@@ -202,7 +203,7 @@ func TestSpecFromMap(t *testing.T) {
 		"regex":      "^x$",
 		"format":     "email",
 		"default":    "d",
-	})
+	}, "")
 
 	assert.Equal(t, "string", spec.Type)
 	assert.Equal(t, &min, spec.Min)

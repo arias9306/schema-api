@@ -2,13 +2,17 @@
 package schema
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/arias9306/schema-api/fakegen"
+	"github.com/arias9306/schema-api/httputil"
+	"github.com/arias9306/schema-api/template"
 )
 
 type ForeignKey struct {
@@ -45,9 +49,33 @@ type Endpoint struct {
 	Response any               `json:"response"`
 }
 
+type JoinCondition struct {
+	Local   string `json:"local"`
+	Foreign string `json:"foreign"`
+}
+
+type Join struct {
+	Type string        `json:"type"`
+	On   JoinCondition `json:"on"`
+}
+
+type TableEndpoint struct {
+	Method   string            `json:"method"`
+	Path     string            `json:"path"`
+	Status   int               `json:"status"`
+	Headers  map[string]string `json:"headers,omitempty"`
+	Tables   []string          `json:"tables"`
+	Joins    []Join            `json:"joins,omitempty"`
+	Where    []string          `json:"where,omitempty"`
+	OrderBy  string            `json:"order_by,omitempty"`
+	Limit    *int              `json:"limit,omitempty"`
+	Response any               `json:"response"`
+}
+
 type Schema struct {
-	Tables    []Table    `json:"tables,omitempty"`
-	Endpoints []Endpoint `json:"endpoints,omitempty"`
+	Tables         []Table         `json:"tables,omitempty"`
+	Endpoints      []Endpoint      `json:"endpoints,omitempty"`
+	TableEndpoints []TableEndpoint `json:"table_endpoints,omitempty"`
 }
 
 var allowedMethods = map[string]bool{
@@ -62,6 +90,8 @@ var wildcardPattern = regexp.MustCompile(`\{([^{}]+)\}`)
 
 var identifierPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*$`)
 
+var tableColumnRegex = regexp.MustCompile(`([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)`)
+
 var validColumnTypes = map[string]bool{
 	"string":   true,
 	"int":      true,
@@ -70,8 +100,37 @@ var validColumnTypes = map[string]bool{
 	"datetime": true,
 }
 
+// CRUDRoutes lists the conventional CRUD routes generated for every table,
+// with the default status code for each.
+var CRUDRoutes = []struct {
+	Method string
+	Suffix string
+	Status int
+}{
+	{"GET", "", 200},
+	{"GET", "/{id}", 200},
+	{"POST", "", 201},
+	{"PUT", "/{id}", 200},
+	{"DELETE", "/{id}", 204},
+}
+
+// IsValidColumnType reports whether t is a supported column type.
+func IsValidColumnType(t string) bool {
+	return validColumnTypes[t]
+}
+
 func (e Endpoint) ParamNames() []string {
-	matches := wildcardPattern.FindAllStringSubmatch(e.Path, -1)
+	return ParamNames(e.Path)
+}
+
+func (e TableEndpoint) ParamNames() []string {
+	return ParamNames(e.Path)
+}
+
+// ParamNames returns the path-parameter names declared in a route path,
+// e.g. "/users/{id}" yields ["id"].
+func ParamNames(path string) []string {
+	matches := wildcardPattern.FindAllStringSubmatch(path, -1)
 	names := make([]string, 0, len(matches))
 	for _, m := range matches {
 		names = append(names, m[1])
@@ -87,6 +146,7 @@ func (s *Schema) Validate() error {
 	var errors []string
 	s.validateTables(&errors)
 	s.validateEndpoints(&errors)
+	s.validateTableEndpoints(&errors)
 
 	if len(errors) > 0 {
 		return fmt.Errorf("invalid schema: %s", strings.Join(errors, "; "))
@@ -176,10 +236,7 @@ func (s *Schema) validateColumns(table *Table, tableLabel string, errors *[]stri
 
 func (s *Schema) validateForeignKey(column *Column, label string, errors *[]string) {
 	parent := column.ForeignKey.Table
-	parentColumn := column.ForeignKey.Column
-	if parentColumn == "" {
-		parentColumn = "id"
-	}
+	parentColumn := cmp.Or(column.ForeignKey.Column, "id")
 
 	var parentTable *Table
 	for i := range s.Tables {
@@ -225,13 +282,131 @@ func (s *Schema) validateEndpoints(errors *[]string) {
 			*errors = append(*errors, fmt.Sprintf("%s (%s %s): response is required", label, endpoint.Method, endpoint.Path))
 		}
 
-		if endpoint.Status == 0 {
-			endpoint.Status = 200
-		}
+		endpoint.Status = cmp.Or(endpoint.Status, 200)
 
-		key := endpoint.Method + " " + endpoint.Path
+		key := httputil.RouteKey(endpoint.Method, endpoint.Path)
 		if first, ok := seen[key]; ok {
 			*errors = append(*errors, fmt.Sprintf("%s (%s): duplicate pattern, already defined at endpoints[%d]", label, key, first))
+		} else {
+			seen[key] = i
+		}
+	}
+}
+
+func (s *Schema) validateTableEndpoints(errors *[]string) {
+	seen := map[string]int{}
+	tableMap := map[string]Table{}
+	tableColumns := map[string]map[string]bool{}
+	for i := range s.Tables {
+		t := &s.Tables[i]
+		tableMap[t.Name] = *t
+		cols := map[string]bool{"id": true}
+		for _, c := range t.Columns {
+			cols[c.Name] = true
+		}
+		tableColumns[t.Name] = cols
+	}
+
+	crudPatterns := map[string]bool{}
+	for _, t := range s.Tables {
+		for _, route := range CRUDRoutes {
+			crudPatterns[httputil.RouteKey(route.Method, "/"+t.Name+route.Suffix)] = true
+		}
+	}
+
+	for i := range s.Endpoints {
+		key := httputil.RouteKey(s.Endpoints[i].Method, s.Endpoints[i].Path)
+		seen[key] = i
+	}
+
+	for i := range s.TableEndpoints {
+		ep := &s.TableEndpoints[i]
+		label := fmt.Sprintf("table_endpoints[%d]", i)
+
+		if strings.TrimSpace(ep.Method) == "" {
+			*errors = append(*errors, fmt.Sprintf("%s: method is required", label))
+		} else {
+			ep.Method = strings.ToUpper(strings.TrimSpace(ep.Method))
+			if ep.Method != "GET" {
+				*errors = append(*errors, fmt.Sprintf("%s: invalid method %q: table endpoints only support GET", label, ep.Method))
+			}
+		}
+
+		if strings.TrimSpace(ep.Path) == "" {
+			*errors = append(*errors, fmt.Sprintf("%s: path is required", label))
+		} else if !strings.HasPrefix(ep.Path, "/") {
+			*errors = append(*errors, fmt.Sprintf("%s (%s %s): path %q must start with /", label, ep.Method, ep.Path, ep.Path))
+		}
+
+		if ep.Response == nil {
+			*errors = append(*errors, fmt.Sprintf("%s (%s %s): response is required", label, ep.Method, ep.Path))
+		}
+
+		ep.Status = cmp.Or(ep.Status, 200)
+
+		tablesSet := map[string]bool{}
+		for _, t := range ep.Tables {
+			if t == "" {
+				*errors = append(*errors, fmt.Sprintf("%s (%s %s): table name is required", label, ep.Method, ep.Path))
+				continue
+			}
+			if _, ok := tableMap[t]; !ok {
+				*errors = append(*errors, fmt.Sprintf("%s (%s %s): references unknown table %q", label, ep.Method, ep.Path, t))
+			}
+			if tablesSet[t] {
+				*errors = append(*errors, fmt.Sprintf("%s (%s %s): duplicate table %q", label, ep.Method, ep.Path, t))
+			}
+			tablesSet[t] = true
+		}
+		if len(ep.Tables) == 0 {
+			*errors = append(*errors, fmt.Sprintf("%s (%s %s): at least one table is required", label, ep.Method, ep.Path))
+		}
+
+		for _, join := range ep.Joins {
+			checkJoinRef := func(ref string, which string) {
+				left, right := template.SplitRef(ref)
+				if !validIdentifier(left) || !validIdentifier(right) {
+					*errors = append(*errors, fmt.Sprintf("%s (%s %s): join %s %q must be in table.column format", label, ep.Method, ep.Path, which, ref))
+					return
+				}
+				if !tablesSet[left] {
+					*errors = append(*errors, fmt.Sprintf("%s (%s %s): join %s references table %q not listed in tables", label, ep.Method, ep.Path, which, left))
+					return
+				}
+				if !tableColumns[left][right] {
+					*errors = append(*errors, fmt.Sprintf("%s (%s %s): join %s references unknown column %q in table %q", label, ep.Method, ep.Path, which, right, left))
+				}
+			}
+			checkJoinRef(join.On.Local, "local")
+			checkJoinRef(join.On.Foreign, "foreign")
+		}
+
+		for _, cond := range ep.Where {
+			stripped := template.RefRegex.ReplaceAllString(cond, "")
+			for _, m := range tableColumnRegex.FindAllStringSubmatch(stripped, -1) {
+				if !tablesSet[m[1]] {
+					*errors = append(*errors, fmt.Sprintf("%s (%s %s): where condition references unknown table %q", label, ep.Method, ep.Path, m[1]))
+				}
+			}
+		}
+
+		if ep.Response != nil {
+			for _, ref := range template.CollectRefs(ep.Response) {
+				left, right := template.SplitRef(ref)
+				if !tablesSet[left] {
+					continue
+				}
+				if !tableColumns[left][right] {
+					*errors = append(*errors, fmt.Sprintf("%s (%s %s): response references unknown column %q in table %q", label, ep.Method, ep.Path, right, left))
+				}
+			}
+		}
+
+		key := httputil.RouteKey(ep.Method, ep.Path)
+		if first, ok := seen[key]; ok {
+			*errors = append(*errors, fmt.Sprintf("%s (%s): duplicate pattern, already defined at index %d", label, key, first))
+		} else if crudPatterns[key] {
+			*errors = append(*errors, fmt.Sprintf("%s (%s): duplicate pattern, shadows a CRUD route", label, key))
 		} else {
 			seen[key] = i
 		}
@@ -248,12 +423,9 @@ func validFormat(format string) bool {
 }
 
 func columnInTable(table *Table, name string) bool {
-	for _, column := range table.Columns {
-		if column.Name == name {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(table.Columns, func(c Column) bool {
+		return c.Name == name
+	})
 }
 
 func ParseSchema(path string) (*Schema, error) {

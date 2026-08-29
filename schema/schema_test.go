@@ -319,6 +319,175 @@ func TestParseSchema(t *testing.T) {
 	})
 }
 
+func tableEndpointSchema(ep TableEndpoint) *Schema {
+	return &Schema{
+		Tables: []Table{
+			{
+				Name: "users",
+				Columns: []Column{
+					{Name: "name", Type: "string"},
+					{Name: "email", Type: "string"},
+				},
+			},
+			{
+				Name: "posts",
+				Columns: []Column{
+					{Name: "title", Type: "string"},
+					{Name: "user_id", Type: "int", ForeignKey: &ForeignKey{Table: "users"}},
+				},
+			},
+		},
+		TableEndpoints: []TableEndpoint{ep},
+	}
+}
+
+func TestValidateTableEndpointsValid(t *testing.T) {
+	ep := TableEndpoint{
+		Method: "GET",
+		Path:   "/users/{id}/posts",
+		Tables: []string{"users", "posts"},
+		Where:  []string{"users.id = {{path.id}}", "posts.status = 'published'"},
+		Response: map[string]any{
+			"user_name": "{{users.name}}",
+			"posts": map[string]any{
+				"type": "array",
+				"items": map[string]any{
+					"title": "{{posts.title}}",
+				},
+			},
+		},
+	}
+	require.NoError(t, tableEndpointSchema(ep).Validate())
+}
+
+func TestValidateTableEndpointsInvalidMethod(t *testing.T) {
+	ep := TableEndpoint{
+		Method:   "POST",
+		Path:     "/users/{id}/posts",
+		Tables:   []string{"users", "posts"},
+		Response: map[string]any{"x": "{{users.name}}"},
+	}
+	err := tableEndpointSchema(ep).Validate()
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "only support GET")
+}
+
+func TestValidateTableEndpointsMissingTables(t *testing.T) {
+	ep := TableEndpoint{
+		Method:   "GET",
+		Path:     "/x",
+		Tables:   []string{"ghosts"},
+		Response: map[string]any{"x": "{{users.name}}"},
+	}
+	err := tableEndpointSchema(ep).Validate()
+	require.Error(t, err)
+	assert.ErrorContains(t, err, `unknown table "ghosts"`)
+}
+
+func TestValidateTableEndpointsDuplicateTables(t *testing.T) {
+	ep := TableEndpoint{
+		Method:   "GET",
+		Path:     "/x",
+		Tables:   []string{"users", "users"},
+		Response: map[string]any{"x": "{{users.name}}"},
+	}
+	err := tableEndpointSchema(ep).Validate()
+	require.Error(t, err)
+	assert.ErrorContains(t, err, `duplicate table "users"`)
+}
+
+func TestValidateTableEndpointsInvalidJoinRef(t *testing.T) {
+	ep := TableEndpoint{
+		Method: "GET",
+		Path:   "/x",
+		Tables: []string{"users", "posts"},
+		Joins: []Join{
+			{Type: "INNER", On: JoinCondition{Local: "users.id", Foreign: "posts.notacolumn"}},
+		},
+		Response: map[string]any{"x": "{{users.name}}"},
+	}
+	err := tableEndpointSchema(ep).Validate()
+	require.Error(t, err)
+	assert.ErrorContains(t, err, `unknown column "notacolumn"`)
+}
+
+func TestValidateTableEndpointsUnknownResponseColumn(t *testing.T) {
+	ep := TableEndpoint{
+		Method:   "GET",
+		Path:     "/x",
+		Tables:   []string{"users", "posts"},
+		Response: map[string]any{"x": "{{users.nonexistent}}"},
+	}
+	err := tableEndpointSchema(ep).Validate()
+	require.Error(t, err)
+	assert.ErrorContains(t, err, `unknown column "nonexistent"`)
+}
+
+func TestValidateTableEndpointsUnknownWhereTable(t *testing.T) {
+	ep := TableEndpoint{
+		Method:   "GET",
+		Path:     "/x",
+		Tables:   []string{"users", "posts"},
+		Where:    []string{"ghosts.id = 1"},
+		Response: map[string]any{"x": "{{users.name}}"},
+	}
+	err := tableEndpointSchema(ep).Validate()
+	require.Error(t, err)
+	assert.ErrorContains(t, err, `unknown table "ghosts"`)
+}
+
+func TestValidateTableEndpointsDuplicatePattern(t *testing.T) {
+	ep := TableEndpoint{
+		Method:   "GET",
+		Path:     "/users/{id}/posts",
+		Tables:   []string{"users", "posts"},
+		Response: map[string]any{"x": "{{users.name}}"},
+	}
+	sch := tableEndpointSchema(ep)
+	sch.Endpoints = []Endpoint{{Method: "GET", Path: "/users/{id}/posts", Response: "x"}}
+	err := sch.Validate()
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "duplicate pattern")
+}
+
+func TestValidateTableEndpointsShadowsCRUD(t *testing.T) {
+	ep := TableEndpoint{
+		Method:   "GET",
+		Path:     "/users",
+		Tables:   []string{"users"},
+		Response: map[string]any{"x": "{{users.name}}"},
+	}
+	err := tableEndpointSchema(ep).Validate()
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "shadows a CRUD route")
+}
+
+func TestValidateTableEndpointsStatusDefault(t *testing.T) {
+	ep := TableEndpoint{
+		Method:   "GET",
+		Path:     "/x",
+		Tables:   []string{"users"},
+		Response: map[string]any{"x": "{{users.name}}"},
+	}
+	sch := tableEndpointSchema(ep)
+	require.NoError(t, sch.Validate())
+	assert.Equal(t, 200, sch.TableEndpoints[0].Status)
+}
+
+func TestValidateTableEndpointsJoinOnReservedId(t *testing.T) {
+	ep := TableEndpoint{
+		Method: "GET",
+		Path:   "/users/{id}/posts",
+		Tables: []string{"users", "posts"},
+		Joins: []Join{
+			{Type: "INNER", On: JoinCondition{Local: "users.id", Foreign: "posts.user_id"}},
+		},
+		Response: map[string]any{"x": "{{users.id}}", "y": "{{posts.title}}"},
+	}
+	err := tableEndpointSchema(ep).Validate()
+	require.NoError(t, err)
+}
+
 func validSchema() *Schema {
 	return &Schema{
 		Tables: []Table{

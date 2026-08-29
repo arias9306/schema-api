@@ -1,0 +1,457 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/arias9306/schema-api/schema-api.schema.json",
+  "title": "Schema API Definition",
+  "description": "Schema definition for schema-api: a schema-driven REST API server that creates an in-memory SQLite database with CRUD endpoints and mock endpoints.",
+  "type": "object",
+  "properties": {
+    "tables": {
+      "type": "array",
+      "description": "Database tables to create. Each table gets auto-generated CRUD endpoints and is seeded with fake data.",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/table"
+      }
+    },
+    "endpoints": {
+      "type": "array",
+      "description": "Mock endpoints with templated responses. Supports path/query/header/body interpolation.",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/endpoint"
+      }
+    },
+    "table_endpoints": {
+      "type": "array",
+      "description": "GET endpoints that query the database tables and return structured, custom-shaped responses.",
+      "items": {
+        "$ref": "#/definitions/table_endpoint"
+      }
+    }
+  },
+  "anyOf": [
+    {
+      "required": ["tables"]
+    },
+    {
+      "required": ["endpoints"]
+    }
+  ],
+  "definitions": {
+    "table": {
+      "type": "object",
+      "description": "A database table definition.",
+      "required": ["name", "columns"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Table name. Must be a valid identifier: [A-Za-z][A-Za-z0-9_]*. Must be unique across all tables.",
+          "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+        },
+        "columns": {
+          "type": "array",
+          "description": "Column definitions for this table.",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/column"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "column": {
+      "type": "object",
+      "description": "A column definition within a table.",
+      "required": ["name", "type"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Column name. Must match [A-Za-z][A-Za-z0-9_]*. The name 'id' is reserved.",
+          "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+        },
+        "type": {
+          "type": "string",
+          "description": "Column data type.",
+          "enum": ["string", "int", "float", "bool", "datetime"]
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether this column is required on insert.",
+          "default": false
+        },
+        "unique": {
+          "type": "boolean",
+          "description": "Whether this column must have unique values.",
+          "default": false
+        },
+        "min": {
+          "type": "number",
+          "description": "Minimum allowed numeric value (for int/float columns)."
+        },
+        "max": {
+          "type": "number",
+          "description": "Maximum allowed numeric value (for int/float columns)."
+        },
+        "min_length": {
+          "type": "integer",
+          "description": "Minimum allowed string length (for string columns).",
+          "minimum": 0
+        },
+        "max_length": {
+          "type": "integer",
+          "description": "Maximum allowed string length (for string columns).",
+          "minimum": 0
+        },
+        "regex": {
+          "type": "string",
+          "description": "Regex pattern for value validation (for string columns)."
+        },
+        "format": {
+          "type": "string",
+          "description": "Fake data generator format. Used to seed realistic data.",
+          "enum": [
+            "name",
+            "firstname",
+            "lastname",
+            "username",
+            "email",
+            "phone",
+            "address",
+            "city",
+            "country",
+            "url",
+            "uuid",
+            "credit_card",
+            "hex_color",
+            "ipv4",
+            "ipv6",
+            "mac_address",
+            "mime_type",
+            "file_extension",
+            "currency_amount",
+            "product_name",
+            "slug",
+            "word",
+            "isbn",
+            "lat",
+            "lng",
+            "timezone",
+            "job_title",
+            "company",
+            "iban",
+            "date",
+            "lorem",
+            "sentence"
+          ]
+        },
+        "default": {
+          "description": "Default value for this column. Can be a literal value (string, number, bool) or 'now' for datetime columns."
+        },
+        "foreign_key": {
+          "$ref": "#/definitions/foreign_key"
+        }
+      },
+      "additionalProperties": false
+    },
+    "foreign_key": {
+      "type": "object",
+      "description": "Foreign key reference to another table.",
+      "required": ["table"],
+      "properties": {
+        "table": {
+          "type": "string",
+          "description": "Name of the referenced table."
+        },
+        "column": {
+          "type": "string",
+          "description": "Name of the referenced column. Defaults to 'id' if not specified.",
+          "default": "id"
+        }
+      },
+      "additionalProperties": false
+    },
+    "endpoint": {
+      "type": "object",
+      "description": "A mock endpoint definition with templated response.",
+      "required": ["method", "path", "response"],
+      "properties": {
+        "method": {
+          "type": "string",
+          "description": "HTTP method for this endpoint.",
+          "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"]
+        },
+        "path": {
+          "type": "string",
+          "description": "URL path starting with '/'. Supports path parameters as {param_name}.",
+          "pattern": "^/"
+        },
+        "status": {
+          "type": "integer",
+          "description": "HTTP status code to return. Defaults to 200.",
+          "default": 200,
+          "minimum": 100,
+          "maximum": 599
+        },
+        "headers": {
+          "type": "object",
+          "description": "Response headers as key-value pairs.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "response": {
+          "$ref": "#/definitions/response"
+        }
+      },
+      "additionalProperties": false
+    },
+    "response": {
+      "description": "Response body definition. Can be a literal value (string, number, bool), a template string, a typed generator, an array, or a nested object. A plain object maps keys to nested responses; a plain array lists nested responses. Wrapper objects use a 'type' field: 'string'/'int'/'float'/'bool'/'datetime' (typed generator), 'array' (with optional 'count' and 'items'), or 'object' (with 'properties').",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/response"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/response"
+          }
+        },
+        {
+          "$ref": "#/definitions/typed_generator"
+        },
+        {
+          "$ref": "#/definitions/array_response"
+        },
+        {
+          "$ref": "#/definitions/object_response"
+        }
+      ]
+    },
+    "typed_generator": {
+      "type": "object",
+      "description": "A typed fake data generator. Generates realistic data of the specified type.",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Data type to generate.",
+          "enum": ["string", "int", "float", "bool", "datetime"]
+        },
+        "format": {
+          "type": "string",
+          "description": "Specific format for the generated data (for string type).",
+          "enum": [
+            "name",
+            "firstname",
+            "lastname",
+            "username",
+            "email",
+            "phone",
+            "address",
+            "city",
+            "country",
+            "url",
+            "uuid",
+            "credit_card",
+            "hex_color",
+            "ipv4",
+            "ipv6",
+            "mac_address",
+            "mime_type",
+            "file_extension",
+            "currency_amount",
+            "product_name",
+            "slug",
+            "word",
+            "isbn",
+            "lat",
+            "lng",
+            "timezone",
+            "job_title",
+            "company",
+            "iban",
+            "date",
+            "lorem",
+            "sentence"
+          ]
+        },
+        "min": {
+          "type": "number",
+          "description": "Minimum value (for int/float types)."
+        },
+        "max": {
+          "type": "number",
+          "description": "Maximum value (for int/float types)."
+        },
+        "min_length": {
+          "type": "integer",
+          "description": "Minimum string length (for string type).",
+          "minimum": 0
+        },
+        "max_length": {
+          "type": "integer",
+          "description": "Maximum string length (for string type).",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "array_response": {
+      "type": "object",
+      "description": "An array response containing multiple items. For mock endpoints 'count' controls how many items are generated (defaults to 1). For table endpoints, 'count' is ignored and the array is built from the query result rows, so 'count' may be omitted.",
+      "required": ["type", "items"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Must be 'array'.",
+          "enum": ["array"]
+        },
+        "count": {
+          "type": "integer",
+          "description": "Number of items to generate in the array (mock endpoints). Ignored for table endpoints. Defaults to 1.",
+          "minimum": 1,
+          "default": 1
+        },
+        "items": {
+          "$ref": "#/definitions/response",
+          "description": "Definition for each item in the array."
+        }
+      },
+      "additionalProperties": false
+    },
+    "object_response": {
+      "type": "object",
+      "description": "A nested object response with named properties.",
+      "required": ["type", "properties"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Must be 'object'.",
+          "enum": ["object"]
+        },
+        "properties": {
+          "type": "object",
+          "description": "Named properties of the response object.",
+          "additionalProperties": {
+            "$ref": "#/definitions/response"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "table_endpoint": {
+      "type": "object",
+      "description": "A table-backed endpoint that runs a real database query and shapes the response from the result set.",
+      "required": ["method", "path", "tables", "response"],
+      "properties": {
+        "method": {
+          "type": "string",
+          "description": "HTTP method. Only GET is supported.",
+          "enum": ["GET"]
+        },
+        "path": {
+          "type": "string",
+          "description": "URL path starting with '/'. Supports path parameters as {param_name}.",
+          "pattern": "^/"
+        },
+        "status": {
+          "type": "integer",
+          "description": "HTTP status code to return. Defaults to 200.",
+          "default": 200,
+          "minimum": 100,
+          "maximum": 599
+        },
+        "headers": {
+          "type": "object",
+          "description": "Response headers as key-value pairs.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "tables": {
+          "type": "array",
+          "description": "Tables to query. Must reference tables defined in 'tables'.",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "joins": {
+          "type": "array",
+          "description": "Explicit join definitions. If omitted, joins are inferred from foreign keys.",
+          "items": {
+            "$ref": "#/definitions/join"
+          }
+        },
+        "where": {
+          "type": "array",
+          "description": "SQL WHERE conditions. Supports {{path.name}}, {{query.name}}, {{header.name}} interpolation.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "order_by": {
+          "type": "string",
+          "description": "SQL ORDER BY clause (e.g. \"posts.id DESC\")."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "SQL LIMIT value.",
+          "minimum": 0
+        },
+        "response": {
+          "$ref": "#/definitions/response",
+          "description": "Response template. Uses {{table.column}} for database values and {\"type\":\"array\",\"items\":{...}} to collect rows."
+        }
+      },
+      "additionalProperties": false
+    },
+    "join": {
+      "type": "object",
+      "description": "An explicit SQL join definition.",
+      "required": ["type", "on"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Join type.",
+          "enum": ["INNER", "LEFT", "RIGHT", "CROSS"]
+        },
+        "on": {
+          "$ref": "#/definitions/join_condition"
+        }
+      },
+      "additionalProperties": false
+    },
+    "join_condition": {
+      "type": "object",
+      "description": "Join columns in table.column format.",
+      "required": ["local", "foreign"],
+      "properties": {
+        "local": {
+          "type": "string",
+          "description": "Column from the left table (table.column).",
+          "pattern": "^[A-Za-z][A-Za-z0-9_]*\\.[A-Za-z][A-Za-z0-9_]*$"
+        },
+        "foreign": {
+          "type": "string",
+          "description": "Column from the right table (table.column).",
+          "pattern": "^[A-Za-z][A-Za-z0-9_]*\\.[A-Za-z][A-Za-z0-9_]*$"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

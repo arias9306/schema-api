@@ -2,9 +2,11 @@
 package db
 
 import (
+	"cmp"
 	"database/sql"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/arias9306/schema-api/schema"
@@ -41,10 +43,7 @@ func CreateTable(db *sql.DB, table schema.Table) error {
 		}
 
 		if column.ForeignKey != nil {
-			refColumn := column.ForeignKey.Column
-			if refColumn == "" {
-				refColumn = "id"
-			}
+			refColumn := cmp.Or(column.ForeignKey.Column, "id")
 			columnDef += " REFERENCES " + quoteIdent(column.ForeignKey.Table) + " (" + quoteIdent(refColumn) + ")"
 		}
 
@@ -103,7 +102,7 @@ func SelectAll(db *sql.DB, table schema.Table, page int, limit int, sort string,
 
 		row := make(map[string]any)
 		for i, col := range cols {
-			row[col] = convertValue(col, values[i], table)
+			row[col] = ConvertValue(col, values[i], table)
 		}
 		results = append(results, row)
 	}
@@ -214,7 +213,7 @@ func scanRow(rows *sql.Rows, table schema.Table) (map[string]any, error) {
 
 	result := make(map[string]any)
 	for i, column := range columns {
-		result[column] = convertValue(column, values[i], table)
+		result[column] = ConvertValue(column, values[i], table)
 	}
 
 	return result, nil
@@ -225,10 +224,10 @@ func sanitizeSort(table schema.Table, sort string) string {
 		return "id"
 	}
 
-	for _, column := range table.Columns {
-		if column.Name == sort {
-			return sort
-		}
+	if slices.ContainsFunc(table.Columns, func(c schema.Column) bool {
+		return c.Name == sort
+	}) {
+		return sort
 	}
 
 	return "id"
@@ -247,7 +246,7 @@ func sanitizeOrder(order string) string {
 	return order
 }
 
-func convertValue(colName string, value any, table schema.Table) any {
+func ConvertValue(colName string, value any, table schema.Table) any {
 	if b, ok := value.([]byte); ok {
 		value = string(b)
 	}

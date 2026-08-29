@@ -22,6 +22,9 @@ templated JSON responses either on their own or alongside tables.
   key violations
 - **Mock endpoints**: declare explicit routes (method, path, status, headers,
   and templated responses) alongside or instead of tables
+- **Table-backed endpoints**: declare `GET`-only endpoints that run real SQL
+  queries (joins, filters, sorting, limits) against your tables and return
+  custom-shaped JSON built from `{{table.column}}` references
 - **Response templating**: generate fields with the shared fake generators or
   interpolate path, query, header, and request-body values into responses
 - **Cross-platform builds**: versioned archives for Linux, macOS, and Windows
@@ -104,16 +107,18 @@ DELETE  /users/{id}          crud    204
 ...
 GET     /users/{id}/profile  mock    200
 POST    /echo                mock    201
+GET     /authors/{id}/posts  table_endpoint  200
 Server running on http://localhost:8080
 ```
 
 ## Schema definition
 
-A schema file is a JSON object with a `tables` array and an optional `endpoints`
-array. The two sections are independent and can coexist: the server enables
-whatever sections the schema declares, and exits with an error if both are
-empty. Each table has a `name` and an array of `columns`. Every table
-automatically gets an `id INTEGER PRIMARY KEY AUTOINCREMENT` column.
+A schema file is a JSON object with a `tables` array, an optional `endpoints`
+array, and an optional `table_endpoints` array. The sections are independent and
+can coexist: the server enables whatever sections the schema declares, and exits
+with an error if `tables` and `endpoints` are both empty. Each table has a
+`name` and an array of `columns`. Every table automatically gets an `id INTEGER
+PRIMARY KEY AUTOINCREMENT` column.
 
 ```json
 {
@@ -357,6 +362,120 @@ To avoid conflicts:
 - Make at least one segment literal or differ in segment count.
 - Keep table names free for CRUD; anchor mock routes under a literal table
   name or dedicated prefix.
+
+## Table endpoints
+
+In addition to CRUD and mock endpoints, you can declare a `table_endpoints`
+array. Each entry defines a `GET`-only route that runs a **real SQL query**
+against your tables and shapes the result rows into a custom JSON response.
+Unlike mock endpoints, the data comes from the database; unlike CRUD, the
+response shape is entirely up to you.
+
+```json
+{
+  "table_endpoints": [
+    {
+      "method": "GET",
+      "path": "/authors/{id}/posts",
+      "status": 200,
+      "headers": { "X-Source": "database" },
+      "tables": ["authors", "posts"],
+      "joins": [
+        {
+          "type": "INNER",
+          "on": { "local": "authors.id", "foreign": "posts.author_id" }
+        }
+      ],
+      "where": ["authors.id = {{path.id}}", "posts.status = 'published'"],
+      "order_by": "posts.published_at DESC",
+      "limit": 20,
+      "response": {
+        "author": "{{authors.name}}",
+        "author_email": "{{authors.email}}",
+        "posts": {
+          "type": "array",
+          "items": {
+            "title": "{{posts.title}}",
+            "slug": "{{posts.slug}}",
+            "view_count": "{{posts.view_count}}"
+          }
+        }
+      }
+    }
+  ]
+}
+```
+
+### Table endpoint properties
+
+| Property   | Type              | Description                                                                                          |
+| ---------- | ----------------- | ---------------------------------------------------------------------------------------------------- |
+| `method`   | string (required) | Must be `GET` (case-insensitive)                                                                     |
+| `path`     | string (required) | Starts with `/`; supports Go 1.22 wildcards like `{id}`                                              |
+| `status`   | int               | Response status code, defaults to `200`                                                              |
+| `headers`  | object            | Static response headers                                                                              |
+| `tables`   | array (required)  | Tables to query (≥1). Must reference tables defined in `tables`                                      |
+| `joins`    | array             | Explicit joins. If omitted, inferred from foreign keys between consecutive `tables`                   |
+| `where`    | array             | SQL `WHERE` conditions; supports `{{path.name}}`, `{{query.name}}`, `{{header.name}}` interpolation |
+| `order_by` | string            | SQL `ORDER BY` clause (e.g. `"posts.id DESC"`)                                                       |
+| `limit`    | int               | SQL `LIMIT` value                                                                                    |
+| `response` | object (required) | Response template (see below)                                                                        |
+
+### Response shaping
+
+The `response` object maps output keys to values:
+
+- **Database values**: a string of the form `{{table.column}}` is replaced with
+  that column from the query result. A scalar reference outside an array uses
+  the first result row's value.
+- **Arrays of rows**: an object with `"type": "array"` and an `items` template
+  collects one object per result row into a JSON array. Inside `items`,
+  `{{table.column}}` references resolve to each row's value.
+- **Generator specs**: objects with a `type` key generate fake data via the
+  shared generators (e.g. `{ "type": "string", "max_length": 12 }`), the same
+  as mock endpoint response templates. These are not read from the database.
+- **Literals / nested objects**: plain strings, numbers, booleans, and nested
+  objects behave as in mock endpoint templates.
+
+Example request/response for the schema above:
+
+```bash
+curl -s "http://localhost:8080/authors/42/posts"
+```
+
+```json
+{
+  "author": "Andres Arias",
+  "author_email": "andres@example.com",
+  "posts": [
+    { "title": "Hello World", "slug": "hello-world", "view_count": 1337 },
+    { "title": "Second Post", "slug": "second-post", "view_count": 42 }
+  ]
+}
+```
+
+### Joins
+
+If `joins` is omitted, a join is inferred between each consecutive pair of
+`tables` using foreign keys (an `INNER JOIN` on `<parent>.id = <child>.<fk>`).
+If no foreign key relationship exists, the schema fails validation. Use the
+explicit `joins` array to override or extend joins:
+
+| Property | Type   | Description                                                       |
+| -------- | ------ | ----------------------------------------------------------------- |
+| `type`   | string | `INNER`, `LEFT`, `RIGHT`, or `CROSS` (defaults to `INNER`)        |
+| `on`     | object | `{ "local": "table.column", "foreign": "table.column" }`          |
+
+All referenced tables and columns must exist in `tables`.
+
+### Route precedence & conflicts
+
+Table endpoints follow the same `ServeMux` precedence rules as mock endpoints
+(see above): a more specific pattern wins, so a table endpoint can shadow a
+CRUD route. A table endpoint that collides with another route on the same
+`method+path` (another table endpoint, a mock endpoint, or a CRUD route) is a
+**startup error**. Keep the first path segment literal (e.g.
+`/authors/{id}/posts`) rather than mirroring CRUD's `{table}` wildcard.
 
 ## API endpoints
 

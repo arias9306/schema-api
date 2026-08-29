@@ -45,7 +45,8 @@
           "type": "string",
           "required": true,
           "min_length": 3,
-          "max_length": 120
+          "max_length": 120,
+          "format": "lorem"
         },
         { "name": "body", "type": "string", "max_length": 2000 },
         {
@@ -69,6 +70,10 @@
           "type": "string",
           "required": true,
           "max_length": 500
+        },
+        {
+          "name": "created_at",
+          "type": "datetime"
         },
         {
           "name": "post_id",

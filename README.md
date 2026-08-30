@@ -55,6 +55,7 @@ Other useful targets:
 make test        # go test ./...
 make test-race   # go test -race ./...
 make coverage    # run tests with a coverage profile and HTML report in coverage/
+make govulncheck # run Go vulnerability scanner against all packages
 make clean       # remove dist/
 ```
 
@@ -68,6 +69,7 @@ make clean       # remove dist/
 | -------------- | ------------ | ---------------------------------------------------------------------------- |
 | `-schema`      | _(required)_ | Path to the JSON schema file                                                 |
 | `-rows`        | `10`         | Number of fake rows to seed per table (use `0` to skip seeding; tables only) |
+| `-host`        | `127.0.0.1`  | Host/interface to bind to; use `0.0.0.0` to expose on all interfaces        |
 | `-port`        | `8080`       | Server port                                                                  |
 | `-cors-origin` | `*`          | Value for the `Access-Control-Allow-Origin` response header                  |
 | `-version`     | `false`      | Print version info and exit                                                  |
@@ -416,8 +418,8 @@ response shape is entirely up to you.
 | `headers`  | object            | Static response headers                                                                              |
 | `tables`   | array (required)  | Tables to query (≥1). Must reference tables defined in `tables`                                      |
 | `joins`    | array             | Explicit joins. If omitted, inferred from foreign keys between consecutive `tables`                   |
-| `where`    | array             | SQL `WHERE` conditions; supports `{{path.name}}`, `{{query.name}}`, `{{header.name}}` interpolation |
-| `order_by` | string            | SQL `ORDER BY` clause (e.g. `"posts.id DESC"`)                                                       |
+| `where`    | array             | SQL `WHERE` conditions; supports `{{path.name}}`, `{{query.name}}`, `{{header.name}}` interpolation. Rejects multi-statement (`;`) and subquery (`(...)`) text |
+| `order_by` | string            | Column and optional direction in `table.column [asc|desc]` form (e.g. `"posts.id DESC"`); must reference a table listed in `tables` with a known column         |
 | `limit`    | int               | SQL `LIMIT` value                                                                                    |
 | `response` | object (required) | Response template (see below)                                                                        |
 
@@ -463,7 +465,7 @@ explicit `joins` array to override or extend joins:
 
 | Property | Type   | Description                                                       |
 | -------- | ------ | ----------------------------------------------------------------- |
-| `type`   | string | `INNER`, `LEFT`, `RIGHT`, or `CROSS` (defaults to `INNER`)        |
+| `type`   | string | `INNER`, `LEFT`, `LEFT OUTER`, `RIGHT`, `RIGHT OUTER`, `FULL`, `FULL OUTER`, or `CROSS` (defaults to `INNER`) |
 | `on`     | object | `{ "local": "table.column", "foreign": "table.column" }`          |
 
 All referenced tables and columns must exist in `tables`.

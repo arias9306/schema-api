@@ -15,7 +15,7 @@ LDFLAGS = -s -w \
 	-X $(PKG)/version.Commit=$(COMMIT) \
 	-X $(PKG)/version.BuildDate=$(BUILD_DATE)
 
-.PHONY: all build test test-race coverage lint clean changelog changelog-unreleased
+.PHONY: all build test test-race coverage lint govulncheck clean changelog changelog-unreleased
 
 all: build
 
@@ -58,6 +58,9 @@ coverage:
 
 lint:
 	golangci-lint run ./...
+
+govulncheck:
+	go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
 clean:
 	rm -rf $(DIST_DIR) coverage

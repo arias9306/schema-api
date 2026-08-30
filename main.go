@@ -23,6 +23,7 @@ import (
 func main() {
 	schemaPath := flag.String("schema", "", "Path to JSON schema file")
 	rows := flag.Int("rows", 10, "Number of fake rows per table")
+	host := flag.String("host", "127.0.0.1", "Host/interface to bind to; use 0.0.0.0 to expose on all interfaces")
 	port := flag.Int("port", 8080, "Server port")
 	showVersion := flag.Bool("version", false, "Print version and exit")
 	corsOrigin := flag.String("cors-origin", "*", "Value for the Access-Control-Allow-Origin header")
@@ -90,8 +91,12 @@ func main() {
 
 	endpoints.PrintTable(endpoints.Collect(schema))
 
+	if *host == "0.0.0.0" || *host == "::" || *host == "" {
+		fmt.Fprintln(os.Stderr, "warning: binding to all interfaces — data is unauthenticated and readable/writable by any LAN host")
+	}
+
 	server := &http.Server{
-		Addr:              fmt.Sprintf(":%d", *port),
+		Addr:              fmt.Sprintf("%s:%d", *host, *port),
 		Handler:           withCORS(withRequestLog(mux), *corsOrigin),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
@@ -112,7 +117,7 @@ func main() {
 		}
 	}()
 
-	fmt.Printf("\nServer running on http://localhost:%d\n", *port)
+	fmt.Printf("\nServer running on http://%s:%d\n", *host, *port)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("Server error: %v", err)
 	}
@@ -144,6 +149,9 @@ func withCORS(next http.Handler, origin string) http.Handler {
 		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Add("Vary", "Origin")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Cache-Control", "no-store")
 
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)

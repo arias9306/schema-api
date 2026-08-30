@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/arias9306/schema-api/db"
 	"github.com/arias9306/schema-api/httputil"
@@ -67,28 +69,29 @@ func (h *Handler) handlerFor(i int) http.HandlerFunc {
 	table := h.tables[ep.Tables[0]]
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := httputil.BuildRequestContext(r, schema.ParamNames(ep.Path), false)
+		ctx := httputil.BuildRequestContext(w, r, schema.ParamNames(ep.Path), false)
+		rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 		query, params, err := db.BuildQuery(*ep, h.tables, ctx)
 		if err != nil {
-			httputil.WriteError(w, http.StatusInternalServerError, "building query: %v", err)
+			httputil.InternalError(w, "building query", err)
 			return
 		}
 
 		rows, err := h.db.Query(query, params...)
 		if err != nil {
-			httputil.WriteError(w, http.StatusInternalServerError, "query failed: %v", err)
+			httputil.InternalError(w, "query failed", err)
 			return
 		}
 		defer rows.Close()
 
 		results, err := scanRows(rows, table)
 		if err != nil {
-			httputil.WriteError(w, http.StatusInternalServerError, "scanning rows: %v", err)
+			httputil.InternalError(w, "scanning rows", err)
 			return
 		}
 
-		rendered := db.BuildTableEndpointResponse(ep.Response, results)
+		rendered := db.BuildTableEndpointResponse(rng, ep.Response, results)
 
 		status := cmp.Or(ep.Status, http.StatusOK)
 
@@ -124,7 +127,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 	rows, total, err := db.SelectAll(h.db, table, page, limit, sort, order)
 	if err != nil {
-		httputil.WriteError(w, http.StatusInternalServerError, "query failed: %v", err)
+		httputil.InternalError(w, "query failed", err)
 		return
 	}
 
@@ -151,7 +154,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 
 	row, err := db.SelectByID(h.db, table, id)
 	if err != nil {
-		httputil.WriteError(w, http.StatusInternalServerError, "query failed: %v", err)
+		httputil.InternalError(w, "query failed", err)
 		return
 	}
 
@@ -193,7 +196,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		httputil.WriteError(w, http.StatusInternalServerError, "failed to insert row: %v", err)
+		httputil.InternalError(w, "failed to insert row", err)
 		return
 	}
 
@@ -222,7 +225,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 
 	existing, err := db.SelectByID(h.db, table, id)
 	if err != nil {
-		httputil.WriteError(w, http.StatusInternalServerError, "query failed: %v", err)
+		httputil.InternalError(w, "query failed", err)
 		return
 	}
 	if existing == nil {
@@ -250,7 +253,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		httputil.WriteError(w, http.StatusInternalServerError, "update failed: %v", err)
+		httputil.InternalError(w, "update failed", err)
 		return
 	}
 
@@ -291,7 +294,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		httputil.WriteError(w, http.StatusInternalServerError, "delete failed: %v", err)
+		httputil.InternalError(w, "delete failed", err)
 		return
 	}
 

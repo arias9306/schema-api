@@ -398,14 +398,16 @@
         },
         "where": {
           "type": "array",
-          "description": "SQL WHERE conditions. Supports {{path.name}}, {{query.name}}, {{header.name}} interpolation.",
+          "description": "SQL WHERE conditions. Supports {{path.name}}, {{query.name}}, {{header.name}} interpolation. Multi-statement (;) and subquery (parenthesized) text is rejected.",
           "items": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^(?![\\s\\S]*[();])[\\s\\S]*$"
           }
         },
         "order_by": {
           "type": "string",
-          "description": "SQL ORDER BY clause (e.g. \"posts.id DESC\")."
+          "description": "Column and optional direction in table.column [asc|desc] form (e.g. \"posts.id DESC\"); must reference a table listed in \"tables\" with a known column.",
+          "pattern": "^[A-Za-z][A-Za-z0-9_]*\\.[A-Za-z][A-Za-z0-9_]*(\\s+(asc|desc))?$"
         },
         "limit": {
           "type": "integer",
@@ -427,7 +429,7 @@
         "type": {
           "type": "string",
           "description": "Join type.",
-          "enum": ["INNER", "LEFT", "RIGHT", "CROSS"]
+          "enum": ["INNER", "LEFT", "LEFT OUTER", "RIGHT", "RIGHT OUTER", "FULL", "FULL OUTER", "CROSS"]
         },
         "on": {
           "$ref": "#/definitions/join_condition"

@@ -10,6 +10,9 @@ import (
 	"strings"
 )
 
+// 1MB
+const maxBodyBytes = 1 << 20
+
 func WriteJSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -23,11 +26,16 @@ func WriteError(w http.ResponseWriter, status int, format string, args ...any) {
 	WriteJSON(w, status, map[string]string{"error": msg})
 }
 
+func InternalError(w http.ResponseWriter, action string, err error) {
+	log.Printf("%s: %v", action, err)
+	WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+}
+
 func RouteKey(method, path string) string {
 	return strings.ToUpper(strings.TrimSpace(method)) + " " + path
 }
 
-func BuildRequestContext(r *http.Request, paramNames []string, includeBody bool) map[string]string {
+func BuildRequestContext(w http.ResponseWriter, r *http.Request, paramNames []string, includeBody bool) map[string]string {
 	ctx := map[string]string{}
 
 	for _, name := range paramNames {
@@ -47,6 +55,7 @@ func BuildRequestContext(r *http.Request, paramNames []string, includeBody bool)
 	}
 
 	if includeBody {
+		r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
 		var body map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&body); err == nil {
 			for name, value := range body {

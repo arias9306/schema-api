@@ -64,7 +64,7 @@ func (h *Handler) handlerFor(i int) http.HandlerFunc {
 	e := h.endpoints[i]
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := httputil.BuildRequestContext(r, e.ParamNames(), h.bodyRefs[i])
+		ctx := httputil.BuildRequestContext(w, r, e.ParamNames(), h.bodyRefs[i])
 
 		status := cmp.Or(e.Status, http.StatusOK)
 

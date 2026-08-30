@@ -242,6 +242,25 @@ func TestReferencesBody(t *testing.T) {
 	assert.False(t, referencesBody("plain"))
 }
 
+func TestHandlerCapsOversizedBody(t *testing.T) {
+	h := NewHandler([]schema.Endpoint{
+		{Method: "POST", Path: "/echo", Response: map[string]any{"echo": "{{body.name}}"}},
+	})
+
+	mux := http.NewServeMux()
+	require.NoError(t, h.Register(mux))
+
+	big := `{"name":"` + strings.Repeat("a", 2<<20) + `"}`
+	req := httptest.NewRequest("POST", "/echo", strings.NewReader(big))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
+	assert.Equal(t, "", got["echo"])
+}
+
 func TestRegister(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
 		h := NewHandler([]schema.Endpoint{

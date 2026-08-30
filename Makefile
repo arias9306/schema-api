@@ -15,7 +15,7 @@ LDFLAGS = -s -w \
 	-X $(PKG)/version.Commit=$(COMMIT) \
 	-X $(PKG)/version.BuildDate=$(BUILD_DATE)
 
-.PHONY: all build test test-race coverage lint govulncheck clean changelog changelog-unreleased
+.PHONY: all build test test-race coverage bench lint govulncheck clean changelog changelog-unreleased
 
 all: build
 
@@ -48,6 +48,9 @@ test:
 
 test-race:
 	go test -race ./...
+
+bench:
+	go test -run xxx -bench . -benchmem -benchtime=1s ./...
 
 coverage:
 	@mkdir -p coverage

@@ -178,6 +178,23 @@ func Update(db *sql.DB, table schema.Table, id int64, data map[string]any) error
 	return nil
 }
 
+func TablesEmpty(db *sql.DB, tables []schema.Table) (bool, error) {
+	for _, table := range tables {
+		query := fmt.Sprintf("SELECT COUNT(1) FROM %s", quoteIdent(table.Name))
+
+		var count int
+		if err := db.QueryRow(query).Scan(&count); err != nil {
+			return false, fmt.Errorf("counting %s: %w", table.Name, err)
+		}
+
+		if count > 0 {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
 func Delete(db *sql.DB, tableName string, id int64) error {
 	query := fmt.Sprintf("DELETE FROM %s WHERE id = ?", quoteIdent(tableName))
 	result, err := db.Exec(query, id)

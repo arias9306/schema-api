@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"flag"
 	"fmt"
@@ -22,6 +23,7 @@ import (
 
 func main() {
 	schemaPath := flag.String("schema", "", "Path to JSON schema file")
+	dbPath := flag.String("db", "", "Path to a persistent SQLite file; empty uses an in-memory database")
 	rows := flag.Int("rows", 10, "Number of fake rows per table")
 	host := flag.String("host", "127.0.0.1", "Host/interface to bind to; use 0.0.0.0 to expose on all interfaces")
 	port := flag.Int("port", 8080, "Server port")
@@ -49,8 +51,7 @@ func main() {
 	mux := http.NewServeMux()
 
 	if len(schema.Tables) > 0 {
-		// TODO: maybe support to add db persistence
-		database, err := db.InitDB(":memory:")
+		database, err := db.InitDB(cmp.Or(*dbPath, ":memory:"))
 		if err != nil {
 			log.Fatalf("failed to initialize database: %v", err)
 		}
@@ -63,11 +64,20 @@ func main() {
 		}
 
 		if *rows > 0 {
-			fmt.Printf("seeding %d rows per table...\n", *rows)
-			if err := seed.Seed(database, schema, *rows); err != nil {
-				log.Fatalf("failed to seed data: %v", err)
+			empty, err := db.TablesEmpty(database, schema.Tables)
+			if err != nil {
+				log.Fatalf("failed to check existing data: %v", err)
 			}
-			fmt.Println("seeding complete.")
+
+			if !empty {
+				fmt.Println("database already populated, skipping seed.")
+			} else {
+				fmt.Printf("seeding %d rows per table...\n", *rows)
+				if err := seed.Seed(database, schema, *rows); err != nil {
+					log.Fatalf("failed to seed data: %v", err)
+				}
+				fmt.Println("seeding complete.")
+			}
 		}
 
 		mockHanlder := api.NewAPIHandler(database, schema)

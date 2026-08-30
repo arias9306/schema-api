@@ -281,6 +281,26 @@ func TestDelete(t *testing.T) {
 	})
 }
 
+func TestTablesEmpty(t *testing.T) {
+	database := openTestDB(t)
+	sch := createTestTables(t, database)
+	users := sch.Tables[0]
+
+	t.Run("fresh tables are empty", func(t *testing.T) {
+		empty, err := TablesEmpty(database, sch.Tables)
+		require.NoError(t, err)
+		assert.True(t, empty)
+	})
+
+	t.Run("any populated table is not empty", func(t *testing.T) {
+		insertUser(t, database, users, "Alice", "alice@example.com")
+
+		empty, err := TablesEmpty(database, sch.Tables)
+		require.NoError(t, err)
+		assert.False(t, empty)
+	})
+}
+
 func TestConvertValue(t *testing.T) {
 	sch := createTestTables(t, openTestDB(t))
 	users := sch.Tables[0]

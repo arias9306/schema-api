@@ -1,15 +1,17 @@
 # schema-api
 
 A schema-driven REST API server written in Go. Define your database tables in a
-simple JSON schema file, and `schema-api` creates an in-memory SQLite database,
-seeds it with realistic sample data, and exposes full CRUD endpoints backed by
-schema-aware validation. You can also declare explicit mock endpoints that serve
-templated JSON responses either on their own or alongside tables.
+simple JSON schema file, and `schema-api` creates an in-memory SQLite database
+(or an on-disk one you can persist across runs), seeds it with realistic sample
+data, and exposes full CRUD endpoints backed by schema-aware validation. You can
+also declare explicit mock endpoints that serve templated JSON responses either
+on their own or alongside tables.
 
 ## Features
 
 - **Schema-driven tables**: describe tables and columns in a single JSON file
-- **In-memory SQLite**: tables are created automatically on startup
+- **SQLite storage**: in-memory by default, or an on-disk database file that
+  persists across runs via the `-db` flag
 - **Realistic sample data**: built-in generators for names, emails, phones,
   addresses, credit cards, IBANs, IP addresses, coordinates, lorem text,
   UUIDs, and more
@@ -55,6 +57,7 @@ Other useful targets:
 make test        # go test ./...
 make test-race   # go test -race ./...
 make coverage    # run tests with a coverage profile and HTML report in coverage/
+make govulncheck # run Go vulnerability scanner against all packages
 make clean       # remove dist/
 ```
 
@@ -67,20 +70,29 @@ make clean       # remove dist/
 | Flag           | Default      | Description                                                                  |
 | -------------- | ------------ | ---------------------------------------------------------------------------- |
 | `-schema`      | _(required)_ | Path to the JSON schema file                                                 |
+| `-db`          | `""`         | Path to a persistent SQLite file; empty uses an in-memory database           |
 | `-rows`        | `10`         | Number of fake rows to seed per table (use `0` to skip seeding; tables only) |
+| `-host`        | `127.0.0.1`  | Host/interface to bind to; use `0.0.0.0` to expose on all interfaces        |
 | `-port`        | `8080`       | Server port                                                                  |
 | `-cors-origin` | `*`          | Value for the `Access-Control-Allow-Origin` response header                  |
 | `-version`     | `false`      | Print version info and exit                                                  |
 
 The `-schema` flag is required; the server exits with an error if it is omitted.
 
+By default the database is in-memory and wiped on exit. Pass `-db <path>` to
+persist data to a SQLite file so it survives restarts: on the first run the
+tables are created and seeded as usual, and on later runs against an already-
+populated file seeding is skipped (the existing data, including any changes made
+through the API, is kept). Use `-rows 0` to disable seeding entirely.
+
 Examples:
 
 ```bash
-./schema-api -schema schema.json            # seed 10 rows, port 8080
+./schema-api -schema schema.json            # in-memory DB, seed 10 rows, port 8080
+./schema-api -schema schema.json -db schema.db   # persistent DB file
 ./schema-api -schema my-schema.json         # custom schema
 ./schema-api -schema schema.json -rows 25 -port 9090
-./schema-api -schema schema.json -rows 0    # start without seeding
+./schema-api -schema schema.json -rows 0    # start without seeding (tables only)
 ./schema-api -version
 # schema-api v1.0.0 (commit <hash>, built <date>)
 ```
@@ -416,8 +428,8 @@ response shape is entirely up to you.
 | `headers`  | object            | Static response headers                                                                              |
 | `tables`   | array (required)  | Tables to query (≥1). Must reference tables defined in `tables`                                      |
 | `joins`    | array             | Explicit joins. If omitted, inferred from foreign keys between consecutive `tables`                   |
-| `where`    | array             | SQL `WHERE` conditions; supports `{{path.name}}`, `{{query.name}}`, `{{header.name}}` interpolation |
-| `order_by` | string            | SQL `ORDER BY` clause (e.g. `"posts.id DESC"`)                                                       |
+| `where`    | array             | SQL `WHERE` conditions; supports `{{path.name}}`, `{{query.name}}`, `{{header.name}}` interpolation. Rejects multi-statement (`;`) and subquery (`(...)`) text |
+| `order_by` | string            | Column and optional direction in `table.column [asc|desc]` form (e.g. `"posts.id DESC"`); must reference a table listed in `tables` with a known column         |
 | `limit`    | int               | SQL `LIMIT` value                                                                                    |
 | `response` | object (required) | Response template (see below)                                                                        |
 
@@ -463,7 +475,7 @@ explicit `joins` array to override or extend joins:
 
 | Property | Type   | Description                                                       |
 | -------- | ------ | ----------------------------------------------------------------- |
-| `type`   | string | `INNER`, `LEFT`, `RIGHT`, or `CROSS` (defaults to `INNER`)        |
+| `type`   | string | `INNER`, `LEFT`, `LEFT OUTER`, `RIGHT`, `RIGHT OUTER`, `FULL`, `FULL OUTER`, or `CROSS` (defaults to `INNER`) |
 | `on`     | object | `{ "local": "table.column", "foreign": "table.column" }`          |
 
 All referenced tables and columns must exist in `tables`.

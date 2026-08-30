@@ -12,7 +12,10 @@ import (
 	"github.com/arias9306/schema-api/schema"
 )
 
+// batchSize bounds how many inserts share a single transaction to avoid holding
+// a write lock for too long while still batching the common case.
 const maxUniqueAttempts = 1000
+const batchSize = 1000
 
 func Seed(database *sql.DB, schema *schema.Schema, rowPerTable int) error {
 	topologicalList, err := topologicalSort(schema.Tables)
@@ -33,6 +36,17 @@ func Seed(database *sql.DB, schema *schema.Schema, rowPerTable int) error {
 				uniqueSets[column.Name] = map[string]bool{}
 			}
 		}
+
+		tx, err := database.Begin()
+		if err != nil {
+			return fmt.Errorf("beginning transaction for %s: %w", table.Name, err)
+		}
+		committed := false
+		defer func() {
+			if !committed {
+				_ = tx.Rollback()
+			}
+		}()
 
 		for i := range rowPerTable {
 			row := map[string]any{}
@@ -62,13 +76,28 @@ func Seed(database *sql.DB, schema *schema.Schema, rowPerTable int) error {
 			}
 
 			// Insert Row
-			id, err := db.Insert(database, table, row)
+			id, err := db.Insert(tx, table, row)
 			if err != nil {
 				return fmt.Errorf("seeding %s row %d: %w", table.Name, i, err)
 			}
 
 			parentIDs[table.Name] = append(parentIDs[table.Name], id)
+
+			if (i+1)%batchSize == 0 {
+				if err := tx.Commit(); err != nil {
+					return fmt.Errorf("committing %s batch: %w", table.Name, err)
+				}
+				tx, err = database.Begin()
+				if err != nil {
+					return fmt.Errorf("beginning transaction for %s: %w", table.Name, err)
+				}
+			}
 		}
+
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("committing %s: %w", table.Name, err)
+		}
+		committed = true
 	}
 
 	return nil

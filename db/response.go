@@ -5,21 +5,20 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
-	"time"
 
 	"github.com/arias9306/schema-api/fakegen"
 	"github.com/arias9306/schema-api/template"
 )
 
-func BuildTableEndpointResponse(template any, rows []map[string]any) any {
+func BuildTableEndpointResponse(rng *rand.Rand, template any, rows []map[string]any) any {
 	var firstRow map[string]any
 	if len(rows) > 0 {
 		firstRow = rows[0]
 	}
-	return renderTemplate(template, rows, firstRow)
+	return renderTemplate(rng, template, rows, firstRow)
 }
 
-func renderTemplate(template any, rows []map[string]any, currentRow map[string]any) any {
+func renderTemplate(rng *rand.Rand, template any, rows []map[string]any, currentRow map[string]any) any {
 	switch v := template.(type) {
 	case nil, bool, float64, int, int64, string:
 		if s, ok := template.(string); ok {
@@ -30,20 +29,20 @@ func renderTemplate(template any, rows []map[string]any, currentRow map[string]a
 	case []any:
 		out := make([]any, len(v))
 		for i, item := range v {
-			out[i] = renderTemplate(item, rows, currentRow)
+			out[i] = renderTemplate(rng, item, rows, currentRow)
 		}
 		return out
 
 	case map[string]any:
 		if t, ok := v["type"].(string); ok && t == "array" {
-			return renderArray(v, rows)
+			return renderArray(rng, v, rows)
 		}
 		if _, ok := v["type"].(string); ok {
-			return renderSpec(v)
+			return renderSpec(rng, v)
 		}
 		out := make(map[string]any, len(v))
 		for key, val := range v {
-			out[key] = renderTemplate(val, rows, currentRow)
+			out[key] = renderTemplate(rng, val, rows, currentRow)
 		}
 		return out
 
@@ -52,7 +51,7 @@ func renderTemplate(template any, rows []map[string]any, currentRow map[string]a
 	}
 }
 
-func renderArray(spec map[string]any, rows []map[string]any) any {
+func renderArray(rng *rand.Rand, spec map[string]any, rows []map[string]any) any {
 	items := spec["items"]
 	if len(rows) == 0 {
 		return []any{}
@@ -60,7 +59,7 @@ func renderArray(spec map[string]any, rows []map[string]any) any {
 
 	out := make([]any, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, renderTemplate(items, rows, row))
+		out = append(out, renderTemplate(rng, items, rows, row))
 	}
 	return out
 }
@@ -115,12 +114,10 @@ func isSinglePlaceholder(s string) bool {
 		template.RefRegex.ReplaceAllString(trimmed, "") == ""
 }
 
-var specRand = rand.New(rand.NewSource(time.Now().UnixNano()))
-
-func renderSpec(spec map[string]any) any {
+func renderSpec(rng *rand.Rand, spec map[string]any) any {
 	s := fakegen.SpecFromMap(spec, "")
 
-	val, err := fakegen.Value(specRand, s)
+	val, err := fakegen.Value(rng, s)
 	if err != nil {
 		return nil
 	}

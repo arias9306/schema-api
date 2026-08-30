@@ -1,12 +1,14 @@
 package db
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestBuildTableEndpointResponseScalar(t *testing.T) {
+	rng := rand.New(rand.NewSource(1))
 	rows := []map[string]any{
 		{"users__name": "Alice", "users__email": "alice@example.com", "users__id": int64(1)},
 	}
@@ -15,7 +17,7 @@ func TestBuildTableEndpointResponseScalar(t *testing.T) {
 		"user_email": "{{users.email}}",
 	}
 
-	result := BuildTableEndpointResponse(template, rows)
+	result := BuildTableEndpointResponse(rng, template, rows)
 
 	expected := map[string]any{
 		"user_name":  "Alice",
@@ -25,6 +27,7 @@ func TestBuildTableEndpointResponseScalar(t *testing.T) {
 }
 
 func TestBuildTableEndpointResponseArray(t *testing.T) {
+	rng := rand.New(rand.NewSource(1))
 	rows := []map[string]any{
 		{"posts__title": "First"},
 		{"posts__title": "Second"},
@@ -36,7 +39,7 @@ func TestBuildTableEndpointResponseArray(t *testing.T) {
 		},
 	}
 
-	result := BuildTableEndpointResponse(template, rows)
+	result := BuildTableEndpointResponse(rng, template, rows)
 
 	expected := map[string]any{
 		"posts": []any{
@@ -48,6 +51,7 @@ func TestBuildTableEndpointResponseArray(t *testing.T) {
 }
 
 func TestBuildTableEndpointResponseMixed(t *testing.T) {
+	rng := rand.New(rand.NewSource(1))
 	rows := []map[string]any{
 		{"users__name": "Alice", "posts__title": "First"},
 		{"users__name": "Alice", "posts__title": "Second"},
@@ -60,7 +64,7 @@ func TestBuildTableEndpointResponseMixed(t *testing.T) {
 		},
 	}
 
-	result := BuildTableEndpointResponse(template, rows)
+	result := BuildTableEndpointResponse(rng, template, rows)
 
 	expected := map[string]any{
 		"user_name": "Alice",
@@ -73,6 +77,7 @@ func TestBuildTableEndpointResponseMixed(t *testing.T) {
 }
 
 func TestBuildTableEndpointResponseEmptyRows(t *testing.T) {
+	rng := rand.New(rand.NewSource(1))
 	rows := []map[string]any{}
 	template := map[string]any{
 		"user_name": "{{users.name}}",
@@ -83,7 +88,7 @@ func TestBuildTableEndpointResponseEmptyRows(t *testing.T) {
 		"literal": "static",
 	}
 
-	result := BuildTableEndpointResponse(template, rows)
+	result := BuildTableEndpointResponse(rng, template, rows)
 
 	expected := map[string]any{
 		"user_name": nil,
@@ -94,13 +99,14 @@ func TestBuildTableEndpointResponseEmptyRows(t *testing.T) {
 }
 
 func TestBuildTableEndpointResponseGeneratorSpec(t *testing.T) {
+	rng := rand.New(rand.NewSource(1))
 	rows := []map[string]any{{"users__name": "Alice"}}
 	template := map[string]any{
 		"user_name": "{{users.name}}",
 		"age":       map[string]any{"type": "int", "min": 18, "max": 80},
 	}
 
-	result := BuildTableEndpointResponse(template, rows)
+	result := BuildTableEndpointResponse(rng, template, rows)
 
 	m := result.(map[string]any)
 	assert.Equal(t, "Alice", m["user_name"])

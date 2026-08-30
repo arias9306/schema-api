@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func openTestDB(t *testing.T) *sql.DB {
+func openTestDB(t testing.TB) *sql.DB {
 	t.Helper()
 	database, err := InitDB(":memory:")
 	require.NoError(t, err)
@@ -17,7 +17,7 @@ func openTestDB(t *testing.T) *sql.DB {
 	return database
 }
 
-func createTestTables(t *testing.T, database *sql.DB) schema.Schema {
+func createTestTables(t testing.TB, database *sql.DB) schema.Schema {
 	t.Helper()
 	sch := schema.Schema{
 		Tables: []schema.Table{
@@ -217,6 +217,50 @@ func TestSelectAll(t *testing.T) {
 	})
 }
 
+func TestInsertReturning(t *testing.T) {
+	database := openTestDB(t)
+	sch := createTestTables(t, database)
+	users := sch.Tables[0]
+
+	row, err := InsertReturning(database, users, map[string]any{
+		"name": "Alice", "email": "alice@example.com",
+		"age": int64(30), "active": true, "score": 9.5,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, row)
+	assert.Equal(t, "Alice", row["name"])
+	assert.Equal(t, true, row["active"])
+	assert.NotNil(t, row["id"])
+}
+
+func TestUpdateReturning(t *testing.T) {
+	database := openTestDB(t)
+	sch := createTestTables(t, database)
+	users := sch.Tables[0]
+	id := insertUser(t, database, users, "Alice", "alice@example.com")
+
+	t.Run("returns the updated row", func(t *testing.T) {
+		row, err := UpdateReturning(database, users, id, map[string]any{"age": int64(31)})
+		require.NoError(t, err)
+		require.NotNil(t, row)
+		assert.Equal(t, int64(31), row["age"])
+		assert.Equal(t, "Alice", row["name"])
+	})
+
+	t.Run("empty update returns the existing row", func(t *testing.T) {
+		row, err := UpdateReturning(database, users, id, map[string]any{})
+		require.NoError(t, err)
+		require.NotNil(t, row)
+		assert.Equal(t, int64(31), row["age"])
+	})
+
+	t.Run("missing row returns nil", func(t *testing.T) {
+		row, err := UpdateReturning(database, users, 999, map[string]any{"age": int64(40)})
+		require.NoError(t, err)
+		assert.Nil(t, row)
+	})
+}
+
 func TestUpdate(t *testing.T) {
 	database := openTestDB(t)
 	sch := createTestTables(t, database)
@@ -281,14 +325,35 @@ func TestDelete(t *testing.T) {
 	})
 }
 
+func TestTablesEmpty(t *testing.T) {
+	database := openTestDB(t)
+	sch := createTestTables(t, database)
+	users := sch.Tables[0]
+
+	t.Run("fresh tables are empty", func(t *testing.T) {
+		empty, err := TablesEmpty(database, sch.Tables)
+		require.NoError(t, err)
+		assert.True(t, empty)
+	})
+
+	t.Run("any populated table is not empty", func(t *testing.T) {
+		insertUser(t, database, users, "Alice", "alice@example.com")
+
+		empty, err := TablesEmpty(database, sch.Tables)
+		require.NoError(t, err)
+		assert.False(t, empty)
+	})
+}
+
 func TestConvertValue(t *testing.T) {
 	sch := createTestTables(t, openTestDB(t))
 	users := sch.Tables[0]
+	boolCols := BoolColumnSet(users)
 
-	assert.Equal(t, true, ConvertValue("active", int64(1), users))
-	assert.Equal(t, false, ConvertValue("active", int64(0), users))
-	assert.Equal(t, "text", ConvertValue("name", []byte("text"), users))
-	assert.Equal(t, int64(5), ConvertValue("age", int64(5), users))
+	assert.Equal(t, true, ConvertValue("active", int64(1), boolCols))
+	assert.Equal(t, false, ConvertValue("active", int64(0), boolCols))
+	assert.Equal(t, "text", ConvertValue("name", []byte("text"), boolCols))
+	assert.Equal(t, int64(5), ConvertValue("age", int64(5), boolCols))
 }
 
 func TestQuoteIdent(t *testing.T) {

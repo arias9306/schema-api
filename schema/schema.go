@@ -100,6 +100,17 @@ var validColumnTypes = map[string]bool{
 	"datetime": true,
 }
 
+var allowedJoinTypes = map[string]bool{
+	"INNER":       true,
+	"LEFT":        true,
+	"LEFT OUTER":  true,
+	"RIGHT":       true,
+	"RIGHT OUTER": true,
+	"FULL":        true,
+	"FULL OUTER":  true,
+	"CROSS":       true,
+}
+
 // CRUDRoutes lists the conventional CRUD routes generated for every table,
 // with the default status code for each.
 var CRUDRoutes = []struct {
@@ -363,6 +374,13 @@ func (s *Schema) validateTableEndpoints(errors *[]string) {
 		}
 
 		for _, join := range ep.Joins {
+			joinType := strings.ToUpper(strings.TrimSpace(join.Type))
+			if joinType == "" {
+				joinType = "INNER"
+			}
+			if !allowedJoinTypes[joinType] {
+				*errors = append(*errors, fmt.Sprintf("%s (%s %s): invalid join type %q: must be one of INNER, LEFT, RIGHT, FULL, CROSS (with optional OUTER)", label, ep.Method, ep.Path, join.Type))
+			}
 			checkJoinRef := func(ref string, which string) {
 				left, right := template.SplitRef(ref)
 				if !validIdentifier(left) || !validIdentifier(right) {
@@ -382,12 +400,22 @@ func (s *Schema) validateTableEndpoints(errors *[]string) {
 		}
 
 		for _, cond := range ep.Where {
+			if strings.Contains(cond, ";") {
+				*errors = append(*errors, fmt.Sprintf("%s (%s %s): where condition must not contain ';'", label, ep.Method, ep.Path))
+			}
+			if strings.ContainsAny(cond, "()") {
+				*errors = append(*errors, fmt.Sprintf("%s (%s %s): where condition must not contain parentheses (subqueries are not allowed)", label, ep.Method, ep.Path))
+			}
 			stripped := template.RefRegex.ReplaceAllString(cond, "")
 			for _, m := range tableColumnRegex.FindAllStringSubmatch(stripped, -1) {
 				if !tablesSet[m[1]] {
 					*errors = append(*errors, fmt.Sprintf("%s (%s %s): where condition references unknown table %q", label, ep.Method, ep.Path, m[1]))
 				}
 			}
+		}
+
+		if ep.OrderBy != "" {
+			s.validateTableEndpointOrderBy(ep, label, tablesSet, tableColumns, errors)
 		}
 
 		if ep.Response != nil {
@@ -410,6 +438,34 @@ func (s *Schema) validateTableEndpoints(errors *[]string) {
 		} else {
 			seen[key] = i
 		}
+	}
+}
+
+func (s *Schema) validateTableEndpointOrderBy(ep *TableEndpoint, label string, tablesSet map[string]bool, tableColumns map[string]map[string]bool, errors *[]string) {
+	parts := strings.Fields(strings.TrimSpace(ep.OrderBy))
+	if len(parts) == 0 || len(parts) > 2 {
+		*errors = append(*errors, fmt.Sprintf("%s (%s %s): order_by %q must be in table.column[ asc|desc] format", label, ep.Method, ep.Path, ep.OrderBy))
+		return
+	}
+
+	if len(parts) == 2 {
+		dir := strings.ToLower(parts[1])
+		if dir != "asc" && dir != "desc" {
+			*errors = append(*errors, fmt.Sprintf("%s (%s %s): order_by direction %q must be asc or desc", label, ep.Method, ep.Path, parts[1]))
+		}
+	}
+
+	left, right := template.SplitRef(parts[0])
+	if !validIdentifier(left) || !validIdentifier(right) {
+		*errors = append(*errors, fmt.Sprintf("%s (%s %s): order_by %q must reference a table.column", label, ep.Method, ep.Path, parts[0]))
+		return
+	}
+	if !tablesSet[left] {
+		*errors = append(*errors, fmt.Sprintf("%s (%s %s): order_by references table %q not listed in tables", label, ep.Method, ep.Path, left))
+		return
+	}
+	if !tableColumns[left][right] {
+		*errors = append(*errors, fmt.Sprintf("%s (%s %s): order_by references unknown column %q in table %q", label, ep.Method, ep.Path, right, left))
 	}
 }
 

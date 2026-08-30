@@ -488,6 +488,119 @@ func TestValidateTableEndpointsJoinOnReservedId(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestValidateTableEndpointsInvalidJoinType(t *testing.T) {
+	cases := []string{"DROP", "INNER JOIN", "left join"}
+	for _, jt := range cases {
+		t.Run(jt, func(t *testing.T) {
+			ep := TableEndpoint{
+				Method: "GET",
+				Path:   "/x",
+				Tables: []string{"users", "posts"},
+				Joins: []Join{
+					{Type: jt, On: JoinCondition{Local: "users.id", Foreign: "posts.user_id"}},
+				},
+				Response: map[string]any{"x": "{{users.name}}"},
+			}
+			err := tableEndpointSchema(ep).Validate()
+			require.Error(t, err)
+			assert.ErrorContains(t, err, "invalid join type")
+		})
+	}
+}
+
+func TestValidateTableEndpointsValidJoinType(t *testing.T) {
+	ep := TableEndpoint{
+		Method: "GET",
+		Path:   "/x",
+		Tables: []string{"users", "posts"},
+		Joins: []Join{
+			{Type: "LEFT OUTER", On: JoinCondition{Local: "users.id", Foreign: "posts.user_id"}},
+		},
+		Response: map[string]any{"x": "{{users.name}}"},
+	}
+	require.NoError(t, tableEndpointSchema(ep).Validate())
+}
+
+func TestValidateTableEndpointsWhereMultiStatement(t *testing.T) {
+	ep := TableEndpoint{
+		Method:   "GET",
+		Path:     "/x",
+		Tables:   []string{"users", "posts"},
+		Where:    []string{"users.id = 1; DROP TABLE posts"},
+		Response: map[string]any{"x": "{{users.name}}"},
+	}
+	err := tableEndpointSchema(ep).Validate()
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "must not contain ';'")
+}
+
+func TestValidateTableEndpointsWhereSubquery(t *testing.T) {
+	ep := TableEndpoint{
+		Method:   "GET",
+		Path:     "/x",
+		Tables:   []string{"users", "posts"},
+		Where:    []string{"users.id IN (SELECT id FROM posts)"},
+		Response: map[string]any{"x": "{{users.name}}"},
+	}
+	err := tableEndpointSchema(ep).Validate()
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "must not contain parentheses")
+}
+
+func TestValidateTableEndpointsOrderByValid(t *testing.T) {
+	cases := []string{"users.name", "users.name asc", "users.name DESC"}
+	for _, ob := range cases {
+		t.Run(ob, func(t *testing.T) {
+			ep := TableEndpoint{
+				Method:   "GET",
+				Path:     "/x",
+				Tables:   []string{"users", "posts"},
+				OrderBy:  ob,
+				Response: map[string]any{"x": "{{users.name}}"},
+			}
+			require.NoError(t, tableEndpointSchema(ep).Validate())
+		})
+	}
+}
+
+func TestValidateTableEndpointsOrderByInvalidDirection(t *testing.T) {
+	ep := TableEndpoint{
+		Method:   "GET",
+		Path:     "/x",
+		Tables:   []string{"users", "posts"},
+		OrderBy:  "users.name sideways",
+		Response: map[string]any{"x": "{{users.name}}"},
+	}
+	err := tableEndpointSchema(ep).Validate()
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "must be asc or desc")
+}
+
+func TestValidateTableEndpointsOrderByUnknownColumn(t *testing.T) {
+	ep := TableEndpoint{
+		Method:   "GET",
+		Path:     "/x",
+		Tables:   []string{"users", "posts"},
+		OrderBy:  "users.nonexistent",
+		Response: map[string]any{"x": "{{users.name}}"},
+	}
+	err := tableEndpointSchema(ep).Validate()
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "unknown column \"nonexistent\"")
+}
+
+func TestValidateTableEndpointsOrderByInjection(t *testing.T) {
+	ep := TableEndpoint{
+		Method:   "GET",
+		Path:     "/x",
+		Tables:   []string{"users", "posts"},
+		OrderBy:  "users.name; DROP TABLE users",
+		Response: map[string]any{"x": "{{users.name}}"},
+	}
+	err := tableEndpointSchema(ep).Validate()
+	require.Error(t, err)
+}
+
 func validSchema() *Schema {
 	return &Schema{
 		Tables: []Table{

@@ -250,6 +250,14 @@ func TestUpdate(t *testing.T) {
 		require.Equal(t, http.StatusBadRequest, rec.Code)
 	})
 
+	t.Run("empty update is a no-op returning the row", func(t *testing.T) {
+		rec := doRequest(t, mux, "PUT", "/users/"+idStr, `{}`)
+		require.Equal(t, http.StatusOK, rec.Code)
+
+		row := decodeRow(t, rec.Body.Bytes())
+		assert.Equal(t, "Alice", row["name"])
+	})
+
 	t.Run("validation error", func(t *testing.T) {
 		rec := doRequest(t, mux, "PUT", "/users/"+idStr, `{"age":"old"}`)
 		require.Equal(t, http.StatusUnprocessableEntity, rec.Code)

@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.6] - 2026-08-30
+
+### Added
+
+- Add govulncheck target, enhance error handling, and improve schema validation
+- Implement persistent db
+- Add benchmark target to Makefile for performance testing
+
+### Changed
+
+- Update readme
+- Enhance database persistence and performance with new SQLite options, add InsertReturning and UpdateReturning functions, and improve seeding efficiency
+- Merge pull request #4 from arias9306/persist-db
+
 ## [0.0.5] - 2026-08-29
 
 ### Added
@@ -24,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Streamline endpoint registration and context handling using httputil package
 - Enhance schema definitions and examples
 - Merge pull request #3 from arias9306/support-query-tables
+- Update changelog for v0.0.5
 
 ## [0.0.4] - 2026-08-22
 
@@ -114,6 +129,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Correct receiver name in HasErrors method for consistency
 - Correct property names for min_length and max_length in users table
 
+[0.0.6]: https://github.com/arias9306/schema-api/compare/v0.0.5..v0.0.6
 [0.0.5]: https://github.com/arias9306/schema-api/compare/v0.0.4..v0.0.5
 [0.0.4]: https://github.com/arias9306/schema-api/compare/v0.0.3..v0.0.4
 [0.0.3]: https://github.com/arias9306/schema-api/compare/v0.0.2..v0.0.3

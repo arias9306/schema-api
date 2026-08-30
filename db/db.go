@@ -25,7 +25,35 @@ func InitDB(path string) (*sql.DB, error) {
 		return nil, fmt.Errorf("enabling foreign keys: %w", err)
 	}
 
+	if isMemory(path) {
+		// :memory: is a single writer; serialize access and tune for speed.
+		db.SetMaxOpenConns(1)
+		db.SetMaxIdleConns(1)
+		if _, err := db.Exec("PRAGMA synchronous = OFF"); err != nil {
+			return nil, fmt.Errorf("disabling synchronous writes: %w", err)
+		}
+		return db, nil
+	}
+
+	// File-backed databases support a small pool and WAL for concurrent reads.
+	db.SetMaxOpenConns(5)
+	db.SetMaxIdleConns(5)
+	pragmas := []struct{ statement, label string }{
+		{"PRAGMA journal_mode = WAL", "enabling WAL"},
+		{"PRAGMA busy_timeout = 5000", "setting busy timeout"},
+	}
+	for _, p := range pragmas {
+		if _, err := db.Exec(p.statement); err != nil {
+			return nil, fmt.Errorf("%s: %w", p.label, err)
+		}
+	}
+
 	return db, nil
+}
+
+func isMemory(path string) bool {
+	return !strings.HasPrefix(path, "file:") &&
+		(path == "" || path == ":memory:")
 }
 
 func CreateTable(db *sql.DB, table schema.Table) error {
@@ -87,22 +115,23 @@ func SelectAll(db *sql.DB, table schema.Table, page int, limit int, sort string,
 		return nil, 0, err
 	}
 
+	boolCols := BoolColumnSet(table)
 	results := []map[string]any{}
+
+	values := make([]any, len(cols))
+	valuePtrs := make([]any, len(cols))
+	for i := range values {
+		valuePtrs[i] = &values[i]
+	}
+
 	for rows.Next() {
-		values := make([]any, len(cols))
-		valuePtrs := make([]any, len(cols))
-
-		for i := range values {
-			valuePtrs[i] = &values[i]
-		}
-
 		if err := rows.Scan(valuePtrs...); err != nil {
 			return nil, 0, fmt.Errorf("scanning row: %w", err)
 		}
 
 		row := make(map[string]any)
 		for i, col := range cols {
-			row[col] = ConvertValue(col, values[i], table)
+			row[col] = ConvertValue(col, values[i], boolCols)
 		}
 		results = append(results, row)
 	}
@@ -126,7 +155,13 @@ func SelectByID(db *sql.DB, table schema.Table, id int64) (map[string]any, error
 	return scanRow(rows, table)
 }
 
-func Insert(db *sql.DB, table schema.Table, data map[string]any) (int64, error) {
+// Inserter is implemented by both *sql.DB and *sql.Tx so Insert can run inside
+// a transaction (for batched seeding) or directly on the connection pool.
+type Inserter interface {
+	Exec(query string, args ...any) (sql.Result, error)
+}
+
+func Insert(db Inserter, table schema.Table, data map[string]any) (int64, error) {
 	columns := make([]string, 0, len(data))
 	values := make([]any, 0, len(data))
 
@@ -150,6 +185,39 @@ func Insert(db *sql.DB, table schema.Table, data map[string]any) (int64, error) 
 	}
 
 	return result.LastInsertId()
+}
+
+// InsertReturning inserts a row and returns it in one round-trip using
+// RETURNING, avoiding the follow-up SelectByID in the request hot path.
+func InsertReturning(db *sql.DB, table schema.Table, data map[string]any) (map[string]any, error) {
+	columns := make([]string, 0, len(data))
+	values := make([]any, 0, len(data))
+
+	for _, column := range table.Columns {
+		if value, ok := data[column.Name]; ok {
+			columns = append(columns, quoteIdent(column.Name))
+			values = append(values, value)
+		}
+	}
+
+	placeholders := make([]string, len(columns))
+	for i := range placeholders {
+		placeholders[i] = "?"
+	}
+
+	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s) RETURNING *", quoteIdent(table.Name), strings.Join(columns, ", "), strings.Join(placeholders, ", "))
+
+	rows, err := db.Query(query, values...)
+	if err != nil {
+		return nil, fmt.Errorf("inserting into %s: %w", table.Name, err)
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return nil, fmt.Errorf("insert into %s returned no row", table.Name)
+	}
+
+	return scanRow(rows, table)
 }
 
 func Update(db *sql.DB, table schema.Table, id int64, data map[string]any) error {
@@ -176,6 +244,39 @@ func Update(db *sql.DB, table schema.Table, id int64, data map[string]any) error
 	}
 
 	return nil
+}
+
+// UpdateReturning updates a row and returns it in one round-trip using
+// RETURNING, avoiding the follow-up SelectByID in the request hot path.
+func UpdateReturning(db *sql.DB, table schema.Table, id int64, data map[string]any) (map[string]any, error) {
+	sets := []string{}
+	values := []any{}
+
+	for _, column := range table.Columns {
+		if value, ok := data[column.Name]; ok {
+			sets = append(sets, fmt.Sprintf("%s = ?", quoteIdent(column.Name)))
+			values = append(values, value)
+		}
+	}
+
+	if len(sets) == 0 {
+		return SelectByID(db, table, id)
+	}
+
+	values = append(values, id)
+	query := fmt.Sprintf("UPDATE %s SET %s WHERE id = ? RETURNING *", quoteIdent(table.Name), strings.Join(sets, ", "))
+
+	rows, err := db.Query(query, values...)
+	if err != nil {
+		return nil, fmt.Errorf("updating %s: %w", table.Name, err)
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return nil, nil
+	}
+
+	return scanRow(rows, table)
 }
 
 func TablesEmpty(db *sql.DB, tables []schema.Table) (bool, error) {
@@ -229,8 +330,9 @@ func scanRow(rows *sql.Rows, table schema.Table) (map[string]any, error) {
 	}
 
 	result := make(map[string]any)
+	boolCols := BoolColumnSet(table)
 	for i, column := range columns {
-		result[column] = ConvertValue(column, values[i], table)
+		result[column] = ConvertValue(column, values[i], boolCols)
 	}
 
 	return result, nil
@@ -263,16 +365,26 @@ func sanitizeOrder(order string) string {
 	return order
 }
 
-func ConvertValue(colName string, value any, table schema.Table) any {
+// BoolColumnSet returns the set of column names typed as bool for O(1) lookup
+// during cell conversion instead of a linear scan over table.Columns.
+func BoolColumnSet(table schema.Table) map[string]struct{} {
+	boolCols := make(map[string]struct{}, len(table.Columns))
+	for _, column := range table.Columns {
+		if column.Type == "bool" {
+			boolCols[column.Name] = struct{}{}
+		}
+	}
+	return boolCols
+}
+
+func ConvertValue(colName string, value any, boolCols map[string]struct{}) any {
 	if b, ok := value.([]byte); ok {
 		value = string(b)
 	}
 
-	for _, column := range table.Columns {
-		if column.Name == colName && column.Type == "bool" {
-			if n, ok := value.(int64); ok {
-				return n != 0
-			}
+	if _, isBool := boolCols[colName]; isBool {
+		if n, ok := value.(int64); ok {
+			return n != 0
 		}
 	}
 

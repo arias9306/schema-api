@@ -31,6 +31,12 @@ var FirstNames = []string{
 	"Jennifer", "Alvaro", "Alberto", "Sara", "Patricia", "Mateo",
 	"Paula", "Carlos", "Miguel", "Lucia", "Sofia", "Claudia", "Claudio",
 	"Chipiti", "Rocio", "Amparo", "Ana", "Venecia", "Ivan",
+	"Sebastian", "Camila", "Valentina", "Nicolas", "Isabella",
+	"Lucas", "Emma", "Olivia", "Liam", "Noah", "Ethan", "Mia",
+	"Alejandro", "Gabriela", "Ricardo", "Adriana", "Roberto",
+	"Carmen", "Jorge", "Gloria", "Tatiana", "Rafael",
+	"Anthony", "Avery", "Harper", "Evelyn", "Abigail",
+	"Emily", "Ella", "Madison", "Aria", "Scarlett",
 }
 
 var LastNames = []string{
@@ -41,11 +47,19 @@ var LastNames = []string{
 	"Jaimes", "Rodriguez", "Pardo", "Mantilla", "Estupiñan", "Niño", "Narvaez",
 	"Polo", "Padilla", "Pinzón", "Pradilla", "Porras", "Arenas", "Correa", "Carrillo",
 	"Silva", "Ruiz", "Torres", "Vega", "Pereira", "Medina", "Luna",
+	"Ospina", "Cardona", "Acosta", "Velasquez", "Mejia", "Contreras", "Granada",
+	"Smith", "Johnson", "Brown", "Wilson", "Anderson", "Thomas", "White",
+	"Miller", "Martin", "Thompson", "Garcia", "Robinson", "Clark", "Rodriguez",
+	"Lewis", "Lee", "Walker", "Hall", "Young", "King", "Wright", "Lopez",
+	"Quintero", "Zapata", "Navarro", "Camacho", "Serrano", "Peña", "Calderon",
+	"Mora", "Fonseca", "Bermudez", "Cardenas", "Valencia", "Salazar", "Herrera",
 }
 
 var EmailDomains = []string{
 	"gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "protonmail.com",
 	"icloud.com", "company.com", "example.org", "mail.com", "aol.com", "acme.com",
+	"fastmail.com", "tutanota.com", "zoho.com", "live.com", "gmx.com",
+	"ymail.com", "inbox.com",
 }
 
 var Cities = []string{
@@ -53,6 +67,10 @@ var Cities = []string{
 	"Santa Marta", "Pereira", "Manizales", "Cúcuta",
 	"Villavicencio", "Ibagué", "Pasto", "Montería", "Neiva",
 	"Armenia", "Sincelejo", "Popayán", "Tunja", "Valledupar",
+	"Bello", "Itagüí", "Floridablanca", "Dosquebradas", "Palmira",
+	"New York", "London", "Paris", "Tokyo", "Sydney",
+	"Madrid", "Berlin", "Rome", "Toronto", "Mexico City",
+	"Buenos Aires", "Lima", "Santiago", "Quito", "São Paulo",
 }
 
 var Countries = []string{
@@ -60,9 +78,17 @@ var Countries = []string{
 	"Perú", "Ecuador", "Venezuela", "Uruguay", "Paraguay",
 	"Bolivia", "Panamá", "Costa Rica", "Honduras", "Guatemala",
 	"El Salvador", "Nicaragua", "República Dominicana", "Cuba", "España",
+	"United States", "United Kingdom", "France", "Italy", "Germany",
+	"Japan", "China", "India", "South Korea", "Portugal",
+	"Netherlands", "Belgium", "Switzerland", "Norway", "Sweden",
+	"Denmark", "Finland", "Ireland", "Australia", "New Zealand",
+	"Canada", "Israel", "South Africa", "Turkey", "Egypt",
 }
 
-var StreetNames = []string{"Calle", "Carrera"}
+var StreetNames = []string{
+	"Calle", "Carrera", "Avenida", "Diagonal", "Transversal",
+	"Circular", "Vía", "Pasaje",
+}
 
 var MimeTypes = []string{
 	"application/json", "application/xml", "application/pdf", "application/zip",
@@ -71,6 +97,10 @@ var MimeTypes = []string{
 	"audio/mpeg", "video/mp4",
 	"multipart/form-data", "application/octet-stream",
 	"application/x-www-form-urlencoded", "application/vnd.api+json",
+	"image/webp", "image/avif", "video/webm", "font/woff2",
+	"application/wasm", "application/ld+json", "text/markdown",
+	"application/x-yaml", "application/vnd.ms-excel",
+	"application/rtf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 }
 
 var FileExtensions = []string{
@@ -79,6 +109,8 @@ var FileExtensions = []string{
 	".mp3", ".mp4", ".avi", ".mov",
 	".zip", ".tar", ".gz",
 	".html", ".css", ".js", ".json", ".xml", ".csv",
+	".webp", ".avif", ".woff2", ".wasm", ".yaml", ".toml",
+	".md", ".go", ".py", ".rs", ".swift", ".kt",
 }
 
 var ProductAdjectives = []string{
@@ -86,6 +118,8 @@ var ProductAdjectives = []string{
 	"Super", "Hyper", "Turbo", "Power", "Pro",
 	"Elite", "Prime", "Apex", "Summit", "Atlas",
 	"Nova", "Stellar", "Cosmic", "Titan", "Vortex",
+	"Flux", "Blaze", "Crest", "Ripple", "Helix",
+	"Drift", "Vibe", "Shadow", "Phantom", "Zen",
 }
 
 var ProductNouns = []string{
@@ -93,6 +127,8 @@ var ProductNouns = []string{
 	"Vanguard", "Sentinel", "Nexus", "Zenith", "Pulse",
 	"Catalyst", "Eclipse", "Vertex", "Matrix", "Cortex",
 	"Prism", "Forge", "Spark", "Drift", "Surge",
+	"Storm", "Blade", "Arrow", "Compass", "Beacon",
+	"Orbit", "Cipher", "Aegis", "Stratus", "Relay",
 }
 
 var Timezones = []string{
@@ -103,30 +139,44 @@ var Timezones = []string{
 	"Asia/Tokyo", "Asia/Shanghai", "Asia/Kolkata", "Asia/Dubai", "Asia/Singapore",
 	"Australia/Sydney", "Australia/Melbourne", "Pacific/Auckland",
 	"Africa/Cairo", "Africa/Lagos", "America/Sao_Paulo", "America/Mexico_City",
+	"Asia/Seoul", "Asia/Hong_Kong", "Asia/Bangkok", "Asia/Jakarta",
+	"Europe/Istanbul", "Africa/Johannesburg", "America/Argentina/Buenos_Aires",
+	"Pacific/Guam",
 }
 
 var JobTitles = []string{
 	"Software Engineer", "Product Manager", "Data Scientist", "DevOps Engineer",
 	"UX Designer", "Frontend Developer", "Backend Developer", "Full Stack Developer",
 	"Engineering Manager", "Technical Lead", "Solutions Architect", "Site Reliability Engineer",
+	"QA Engineer", "Mobile Developer", "Security Engineer", "Scrum Master",
+	"Content Strategist", "Systems Administrator", "Cloud Architect", "Database Administrator",
+	"Network Engineer", "Technical Writer", "Release Manager", "Machine Learning Engineer",
+	"Platform Engineer", "Product Designer", "Business Analyst", "Data Engineer",
 }
 
 var JobDepartments = []string{
 	"Engineering", "Product", "Marketing", "Sales", "Finance",
 	"Operations", "Design", "Research", "Support", "Legal",
 	"Human Resources", "Data",
+	"Procurement", "Information Technology", "Quality Assurance", "Compliance",
+	"Training", "Logistics", "Customer Success", "Business Intelligence",
+	"Corporate Development",
 }
 
 var CompanyAdjectives = []string{
 	"Quantum", "Nexus", "Apex", "Pulse", "Stellar",
 	"Cyber", "Nova", "Atlas", "Zenith", "Vortex",
 	"Prime", "Vertex", "Cortex", "Titan", "Forge",
+	"Flux", "Blaze", "Ripple", "Helix", "Prism",
+	"Vibe", "Drift", "Shadow", "Phantom", "Zen",
 }
 
 var CompanyNouns = []string{
 	"Labs", "Tech", "Works", "Systems", "Solutions",
 	"Dynamics", "Collective", "Ventures", "Digital", "Logic",
 	"Innovations", "Networks", "Analytics", "Industries", "Partners",
+	"Hub", "Edge", "Forge", "Sync", "Stack",
+	"Cloud", "Stream", "Block", "Pulse", "Base",
 }
 
 var LoremWords = []string{
@@ -381,7 +431,7 @@ func GenLastname(rng *rand.Rand) string {
 }
 
 func GenUsername(rng *rand.Rand) string {
-	return strings.ToLower(GenFirstname(rng)+GenFirstname(rng)) + fmt.Sprintf("%d", rng.Intn(99))
+	return strings.ToLower(GenFirstname(rng)+GenFirstname(rng)) + fmt.Sprintf("%d", rng.Intn(9999))
 }
 
 func GenEmail(rng *rand.Rand) string {

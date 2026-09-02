@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.7] - 2026-09-02
+
+### Changed
+
+- Expand fake data generation with additional names, cities, countries, and job titles
+- Update .gitignore to exclude all database files
+
 ## [0.0.6] - 2026-08-30
 
 ### Added
@@ -18,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update readme
 - Enhance database persistence and performance with new SQLite options, add InsertReturning and UpdateReturning functions, and improve seeding efficiency
 - Merge pull request #4 from arias9306/persist-db
+- Update changelog for v0.0.6
 
 ## [0.0.5] - 2026-08-29
 
@@ -129,6 +137,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Correct receiver name in HasErrors method for consistency
 - Correct property names for min_length and max_length in users table
 
+[0.0.7]: https://github.com/arias9306/schema-api/compare/v0.0.6..v0.0.7
 [0.0.6]: https://github.com/arias9306/schema-api/compare/v0.0.5..v0.0.6
 [0.0.5]: https://github.com/arias9306/schema-api/compare/v0.0.4..v0.0.5
 [0.0.4]: https://github.com/arias9306/schema-api/compare/v0.0.3..v0.0.4

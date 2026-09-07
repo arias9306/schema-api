@@ -26,7 +26,7 @@ func TestWithCORS(t *testing.T) {
 		assert.True(t, called)
 		assert.Equal(t, "https://example.com", rec.Header().Get("Access-Control-Allow-Origin"))
 		assert.Equal(t, "GET, POST, PUT, DELETE, OPTIONS", rec.Header().Get("Access-Control-Allow-Methods"))
-		assert.Equal(t, "Content-Type, Authorization", rec.Header().Get("Access-Control-Allow-Headers"))
+		assert.Equal(t, "Content-Type, Authorization, Cache-Control, X-Requested-With, X-XSRF-TOKEN, Accept", rec.Header().Get("Access-Control-Allow-Headers"))
 		assert.Equal(t, http.StatusOK, rec.Code)
 	})
 
